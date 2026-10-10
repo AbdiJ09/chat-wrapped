@@ -36,7 +36,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(32px, 6vw, 96px);
   align-items: center;
   min-height: calc(100svh - 80px);
@@ -84,18 +84,13 @@ h1 em { color: var(--gold); font-weight: 300; }
 .howto ol { margin: 0; padding-left: 1.1rem; font-size: 0.92rem; color: var(--muted); }
 .howto b { color: var(--cream); font-weight: 500; }
 
-/* a phone playing the example story */
-.phone {
-  position: relative;
-  margin: 0;
-  width: clamp(240px, 26vw, 330px);
-  aspect-ratio: 9 / 16;
-  border-radius: 34px;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px var(--faint), 0 40px 120px rgba(0, 0, 0, 0.6), 0 0 80px rgba(217, 178, 111, 0.08);
-  transform: rotate(2deg);
-}
-.phone canvas, .story__frame canvas { display: block; width: 100%; height: 100%; }
+/* the example chat's DNA, turning behind everything */
+.landing-3d { position: fixed; inset: 0; z-index: 0; }
+.landing-3d canvas { display: block; width: 100%; height: 100%; }
+body.is-story .landing-3d { display: none; }
+.landing { position: relative; z-index: 1; }
+.hero__copy { max-width: 40rem; }
+.story__frame canvas { display: block; width: 100%; height: 100%; }
 
 .bars {
   position: absolute;
@@ -136,8 +131,9 @@ h1 em { color: var(--gold); font-weight: 300; }
 
 /* phones: the story fills the screen like a real one */
 @media (max-width: 640px) {
-  .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 36px; }
-  .phone { width: min(70vw, 300px); justify-self: center; transform: none; }
+  .hero { grid-template-columns: 1fr; min-height: calc(100svh - 60px); align-items: end; padding: 36px 0 24px; }
+  /* phones: the helix glows behind the words, so give them a little shade */
+  .hero__copy h1, .hero__copy .lede, .hero__copy .note { text-shadow: 0 0 18px rgba(10, 9, 8, 0.95), 0 0 42px rgba(10, 9, 8, 0.8); }
   .howto__cols { grid-template-columns: 1fr; }
   body.is-story .story { padding: 0; gap: 0; align-content: stretch; }
   body.is-story .story__frame { height: auto; width: 100vw; max-width: none; max-height: calc(100svh - 64px); border-radius: 0; box-shadow: none; }

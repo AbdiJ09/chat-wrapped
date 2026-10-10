@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
+    <div id="landing-3d" class="landing-3d" aria-hidden="true"></div>
     <main id="landing" class="landing">
       <header class="bar">
         <span>Chat Wrapped</span>
@@ -56,10 +57,6 @@
           </details>
         </div>
 
-        <figure class="phone" aria-label="Contoh cerita">
-          <div id="preview-bars" class="bars"></div>
-          <canvas id="preview-canvas"></canvas>
-        </figure>
       </section>
     </main>
 
@@ -69,7 +66,8 @@
         <canvas id="story-canvas"></canvas>
       </div>
       <nav class="story__actions">
-        <button id="save" class="button button--small">Simpan gambar</button>
+        <button id="save-video" class="button button--small">Simpan video</button>
+        <button id="save" class="link">Simpan gambar</button>
         <button id="save-all" class="link">Simpan semua</button>
         <button id="again" class="link">Chat lain</button>
       </nav>

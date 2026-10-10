@@ -13,6 +13,8 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "mp4-muxer": "^5.2.2",
+    "three": "^0.186.1"
   }
 }

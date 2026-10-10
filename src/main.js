@@ -2,7 +2,10 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { makeStory } from './story/slides.js'
-import { Player, slideImage } from './player.js'
+import { Player } from './player.js'
+import { slideImage, storyVideo, canMakeVideo } from './export.js'
+import { Engine } from './three/engine.js'
+import { nebula, authors } from './three/shapes.js'
 import { demoMessages, formatExport } from './demo.js'
 
 // Everything happens on this page: the chat is read, counted and drawn in the browser, and
@@ -10,11 +13,11 @@ import { demoMessages, formatExport } from './demo.js'
 
 const $ = (id) => document.getElementById(id)
 const landing = $('landing')
-const story = $('story')
+const storyView = $('story')
 const fileInput = $('file')
 const note = $('note')
-let player = null
-let preview = null
+const mobile = matchMedia('(pointer: coarse)').matches
+const N = mobile ? 16000 : 30000
 
 const fontsReady = Promise.all([
   document.fonts.load('300 100px "Fraunces"'),
@@ -22,6 +25,45 @@ const fontsReady = Promise.all([
   document.fonts.load('400 40px "Inter"'),
   document.fonts.load('500 40px "Inter"'),
 ]).catch(() => {})
+
+const engine = new Engine({ count: N })
+let player = null
+let story = null
+
+// — the landing page: the example chat's DNA, turning behind the headline —
+const demoText = formatExport(demoMessages(), 'android-id')
+let demo = null
+let landingT = 0
+let landingOn = false
+let lastNow = performance.now()
+
+async function startLanding() {
+  await fontsReady
+  demo ??= makeStory(computeStats(parseWhatsApp(demoText)), N)
+  const holder = $('landing-3d')
+  holder.append(engine.canvas)
+  engine.setStory([demo[0]], nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
+  landingT = 0
+  landingOn = true
+  lastNow = performance.now()
+  requestAnimationFrame(landingFrame)
+}
+
+function landingFrame(now) {
+  if (!landingOn) return
+  requestAnimationFrame(landingFrame)
+  const dt = Math.min((now - lastNow) / 1000, 0.1)
+  lastNow = now
+  landingT += dt
+  const w = innerWidth
+  const h = innerHeight
+  engine.resize(w, h, Math.min(devicePixelRatio || 1, 1.5))
+  // wide screens: the helix stands to the right of the words
+  engine.shiftX = w / h > 1.1 ? 1.9 : 0
+  // phones: further back and higher, a glow behind the words rather than a wall
+  engine.zoom = w / h > 1.1 ? 1 : 1.5
+  engine.render(0, landingT, landingT)
+}
 
 function error(message) {
   note.textContent = message
@@ -56,27 +98,43 @@ async function open(text, title) {
   if (parsed.messages.length < 30) throw new Error('Chat-nya terlalu pendek untuk diceritain. Coba chat yang lebih panjang.')
   const stats = computeStats(parsed, { title: parsed.people.length > 2 ? title : null })
   await fontsReady
-  show(makeStory(stats))
+  show(text === demoText && demo ? demo : makeStory(stats, N))
+}
+
+function fitEngine() {
+  // the 3D renders at the frame's real pixel size (at most 1080 wide); words are always 1080
+  const r = $('story-frame').getBoundingClientRect()
+  const w = Math.min(1080, Math.round(r.width * Math.min(devicePixelRatio || 1, 2)))
+  engine.resize(w, Math.round((w * 16) / 9), 1)
 }
 
 function show(slides) {
-  preview?.destroy()
+  // the particles fly out of whatever the landing page was showing
+  const from = engine.slides[0]?.shape
+  landingOn = false
   player?.destroy()
   landing.hidden = true
-  story.hidden = false
+  storyView.hidden = false
   document.body.classList.add('is-story')
-  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), slides })
+  engine.shiftX = 0
+  engine.zoom = 1
+  engine.setStory(slides, from ?? nebula(N, authors({ sequence: new Uint16Array([0]) }, N)))
+  story = { engine, slides }
+  fitEngine()
+  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story })
+  $('save-video').hidden = !canMakeVideo()
   scrollTo(0, 0)
 }
 
 function back() {
   player?.destroy()
   player = null
-  story.hidden = true
+  story = null
+  storyView.hidden = true
   landing.hidden = false
   document.body.classList.remove('is-story')
   fileInput.value = ''
-  startPreview()
+  startLanding()
 }
 
 async function handle(file) {
@@ -92,13 +150,9 @@ async function handle(file) {
   }
 }
 
-// — the landing page —
 fileInput.addEventListener('change', () => handle(fileInput.files[0]))
 $('pick').addEventListener('click', () => fileInput.click())
-$('demo').addEventListener('click', async () => {
-  await fontsReady
-  open(formatExport(demoMessages(), 'android-id'), null)
-})
+$('demo').addEventListener('click', () => open(demoText, null))
 addEventListener('dragover', (e) => {
   e.preventDefault()
   document.body.classList.add('is-dragging')
@@ -109,17 +163,11 @@ addEventListener('dragleave', (e) => {
 addEventListener('drop', (e) => {
   e.preventDefault()
   document.body.classList.remove('is-dragging')
-  if (!story.hidden) return
+  if (!storyView.hidden) return
   handle(e.dataTransfer.files[0])
 })
-
-// the example story plays on a little phone next to the headline
-async function startPreview() {
-  await fontsReady
-  const parsed = parseWhatsApp(formatExport(demoMessages(), 'android-id'))
-  preview = new Player({ canvas: $('preview-canvas'), bars: $('preview-bars'), slides: makeStory(computeStats(parsed)), loop: true })
-}
-startPreview()
+addEventListener('resize', () => story && fitEngine())
+startLanding()
 
 // — the story —
 const frame = $('story-frame')
@@ -161,16 +209,14 @@ function download(blob, name) {
   a.href = URL.createObjectURL(blob)
   a.download = name
   a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000)
 }
 const pad = (n) => String(n).padStart(2, '0')
 
-$('save').addEventListener('click', async () => {
-  if (!player) return
-  const blob = await slideImage(player.slide)
-  const file = new File([blob], `chat-wrapped-${pad(player.i + 1)}.png`, { type: 'image/png' })
-  // on phones, straight to the share sheet (Instagram, WhatsApp, Photos)
-  if (navigator.canShare?.({ files: [file] })) {
+// on phones, straight to the share sheet (Instagram, WhatsApp, Photos); elsewhere, a download
+async function deliver(blob, name, type) {
+  const file = new File([blob], name, { type })
+  if (mobile && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] })
       return
@@ -178,22 +224,51 @@ $('save').addEventListener('click', async () => {
       if (err.name === 'AbortError') return
     }
   }
-  download(blob, file.name)
-})
-$('save-all').addEventListener('click', async () => {
-  if (!player) return
-  const button = $('save-all')
+  download(blob, name)
+}
+
+async function busy(button, label, job) {
+  const was = button.textContent
   button.disabled = true
-  button.textContent = 'Menyiapkan…'
-  const files = {}
-  for (let i = 0; i < player.slides.length; i++) {
-    const blob = await slideImage(player.slides[i])
-    files[`chat-wrapped-${pad(i + 1)}.png`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }]
+  button.textContent = label
+  player.paused = true
+  try {
+    await job((text) => (button.textContent = text))
+  } catch (err) {
+    console.error(err)
+    alert(err.message)
+  } finally {
+    button.disabled = false
+    button.textContent = was
+    if (player) player.paused = false
   }
-  download(new Blob([zipSync(files)], { type: 'application/zip' }), 'chat-wrapped.zip')
-  button.disabled = false
-  button.textContent = 'Simpan semua'
+}
+
+$('save').addEventListener('click', () => {
+  if (!player) return
+  busy($('save'), 'Menyimpan…', async () => {
+    const blob = await slideImage(story, player.i)
+    await deliver(blob, `chat-wrapped-${pad(player.i + 1)}.png`, 'image/png')
+  })
+})
+$('save-all').addEventListener('click', () => {
+  if (!player) return
+  busy($('save-all'), 'Menyiapkan…', async () => {
+    const files = {}
+    for (let i = 0; i < story.slides.length; i++) {
+      const blob = await slideImage(story, i)
+      files[`chat-wrapped-${pad(i + 1)}.png`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }]
+    }
+    download(new Blob([zipSync(files)], { type: 'application/zip' }), 'chat-wrapped.zip')
+  })
+})
+$('save-video').addEventListener('click', () => {
+  if (!player) return
+  busy($('save-video'), 'Bikin video 0%', async (say) => {
+    const blob = await storyVideo(story, { onProgress: (p) => say(`Bikin video ${Math.round(p * 100)}%`) })
+    if (blob) await deliver(blob, 'chat-wrapped.mp4', 'video/mp4')
+  })
 })
 $('again').addEventListener('click', back)
 
-if (import.meta.env.DEV) window.__cw = { get player() { return player }, open, demo: () => formatExport(demoMessages(), 'android-id') }
+if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, engine, open, demoText, storyVideo, slideImage, skip: (t) => (landingT = t) }
