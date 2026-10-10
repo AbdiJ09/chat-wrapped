@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Chat Wrapped</title>
+    <meta name="description" content="Ubah chat WhatsApp jadi cerita: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
+    <meta name="theme-color" content="#0f0e0d" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..400&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="landing" class="landing">
+      <header class="bar">
+        <span>Chat Wrapped</span>
+        <span>Dibuat oleh Abi</span>
+      </header>
+
+      <section class="hero">
+        <div class="hero__copy">
+          <h1>Setahun ngobrol,<br /><em>jadi satu cerita.</em></h1>
+          <p class="lede">
+            Masukin export chat WhatsApp-mu. Keluar ceritanya: siapa yang nyapa duluan, siapa yang paling cepet bales, jam paling rame, kata-kata khas kalian. Siap dibagikan ke story.
+          </p>
+          <div class="actions">
+            <button id="pick" class="button">Pilih file chat</button>
+            <button id="demo" class="link">Lihat contoh</button>
+          </div>
+          <p id="note" class="note">Diproses sepenuhnya di browsermu. Chatnya nggak pernah di-upload ke mana pun.</p>
+          <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
+
+          <details class="howto">
+            <summary>Cara export chat</summary>
+            <div class="howto__cols">
+              <div>
+                <h3>Android</h3>
+                <ol>
+                  <li>Buka chat-nya</li>
+                  <li>⋮ → Lainnya → Ekspor chat</li>
+                  <li>Pilih <b>Tanpa media</b></li>
+                  <li>Simpan ke File, lalu pilih di sini</li>
+                </ol>
+              </div>
+              <div>
+                <h3>iPhone</h3>
+                <ol>
+                  <li>Buka chat-nya, ketuk namanya</li>
+                  <li>Ekspor Chat</li>
+                  <li>Pilih <b>Tanpa Media</b></li>
+                  <li>Simpan ke File, lalu pilih di sini</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <figure class="phone" aria-label="Contoh cerita">
+          <div id="preview-bars" class="bars"></div>
+          <canvas id="preview-canvas"></canvas>
+        </figure>
+      </section>
+    </main>
+
+    <section id="story" class="story" hidden>
+      <div id="story-frame" class="story__frame">
+        <div id="bars" class="bars"></div>
+        <canvas id="story-canvas"></canvas>
+      </div>
+      <nav class="story__actions">
+        <button id="save" class="button button--small">Simpan gambar</button>
+        <button id="save-all" class="link">Simpan semua</button>
+        <button id="again" class="link">Chat lain</button>
+      </nav>
+    </section>
+
+    <div class="drop">Lepas file chat di sini</div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
