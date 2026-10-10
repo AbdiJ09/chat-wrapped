@@ -1,7 +1,7 @@
 import { W, H, M, DISPLAY, MONO, at, clamp, easeInOut, num, date, duration, text, wrap, eyebrow, measure, drawGrain } from './draw.js'
 import * as shapes from '../three/shapes.js'
 
-// The story: each slide is a 3D form for the particles (with a camera and a backdrop) plus a
+// The story: each slide is a sculpture for the bubbles (with a camera and a backdrop) plus a
 // layer of words on top. The middle of the frame belongs to the 3D; words live above and below.
 // The theme decides the colours, a few of the forms, and the voice.
 
@@ -57,7 +57,7 @@ function shade(ctx, top = true) {
   }
 }
 
-/** Words appear a beat after the particles start landing. */
+/** Words appear a beat after the bubbles start landing. */
 const late = 1.1
 
 export function makeStory(S, N, theme) {
@@ -72,7 +72,7 @@ export function makeStory(S, N, theme) {
   // backdrops: the theme's dark, lit by each slide's own tint
   const bgs = [theme.glow, mix(theme.bg, theme.people[0], 0.22), mix(theme.bg, theme.people[1], 0.2), mix(theme.glow, theme.people[0], 0.12)]
   let n = 0
-  const backdrop = () => ({ bg: theme.bg, glow: bgs[n++ % bgs.length] })
+  const backdrop = () => ({ bg: theme.bg, glow: bgs[n % bgs.length], rim: theme.people[n++ % 2] })
 
   const slides = []
   const add = (s) => slides.push({ ...backdrop(), ...s })
@@ -86,7 +86,7 @@ export function makeStory(S, N, theme) {
   add({
     duration: 6.5,
     shape: theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
-    cam: theme.id === 'couple' ? { pos: [0, 0.2, 10.5], look: [0, -0.85, 0], orbit: 0.4, speed: 0.3 } : { pos: [0, 0.4, 11], look: [0, -0.9, 0], orbit: 0.5, speed: 0.18 },
+    cam: { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
     words(ctx, t) {
       shade(ctx, false)
       const y0 = 1420
@@ -109,7 +109,7 @@ export function makeStory(S, N, theme) {
     add({
       duration: 6.5,
       shape: shapes.spark(N, A, ai),
-      cam: { pos: [0, 1.0, 6.2], look: [0, -0.75, 0], orbit: 0.4, speed: 0.3 },
+      cam: { pos: [0, 2.0, 7.8], look: [0, 1.0, 0], orbit: 0.45, speed: 0.25 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, V.first, 250, MUTED, at(t, late))
@@ -129,8 +129,8 @@ export function makeStory(S, N, theme) {
   const pages = Math.max(1, Math.ceil(S.words / 250))
   add({
     duration: 6.5,
-    shape: shapes.words(N, A, num(S.total), { width: 1.8 }),
-    cam: { pos: [0, 0.2, 6.4], look: [0, -0.1, 0], orbit: 0.14, speed: 0.4 },
+    shape: shapes.words(N, A, num(S.total), { width: 2.1 }),
+    cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
     words(ctx, t) {
       shade(ctx)
       eyebrow(ctx, 'Total', 250, MUTED, at(t, late))
@@ -147,7 +147,7 @@ export function makeStory(S, N, theme) {
     add({
       duration: 6.5,
       shape: shapes.orbs(N, A, shares),
-      cam: { pos: [0, 0.3, 7.6], look: [0, 0, 0], orbit: 0.3, speed: 0.25 },
+      cam: { pos: [0, 2.2, 9.8], look: [0, 0.85, 0], orbit: 0.4, speed: 0.22 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, V.share, 250, MUTED, at(t, late))
@@ -178,7 +178,7 @@ export function makeStory(S, N, theme) {
     add({
       duration: 8,
       shape: shapes.podium(N, A, podiumTop),
-      cam: { pos: [0, 1.4, 7.8], look: [0, -0.55, 0], orbit: 0.35, speed: 0.25 },
+      cam: { pos: [0, 2.6, 9.6], look: [0, 0.75, 0], orbit: 0.4, speed: 0.22 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, 'Penghargaan', 250, MUTED, at(t, late))
@@ -199,7 +199,7 @@ export function makeStory(S, N, theme) {
   add({
     duration: 6.5,
     shape: S.group || si > 1 ? shapes.orbs(N, A, shares) : shapes.bridge(N, A, shares, si),
-    cam: { pos: [0, 0.6, 7.2], look: [0, 0.2, 0], orbit: 0.35, speed: 0.22 },
+    cam: { pos: [0, 2.4, 10.4], look: [0, 1.1, 0], orbit: 0.35, speed: 0.22 },
     words(ctx, t) {
       shade(ctx)
       eyebrow(ctx, V.starter, 250, MUTED, at(t, late))
@@ -219,7 +219,7 @@ export function makeStory(S, N, theme) {
     add({
       duration: 6.5,
       shape: shapes.rings(N, A, speeds),
-      cam: { pos: [0, 2.2, 6.8], look: [0, -0.2, 0], orbit: 0.3, speed: 0.2 },
+      cam: { pos: [0, 3.8, 8.2], look: [0, 0.9, 0], orbit: 0.35, speed: 0.2 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, 'Kecepatan bales', 250, MUTED, at(t, late))
@@ -244,7 +244,7 @@ export function makeStory(S, N, theme) {
   add({
     duration: 6.5,
     shape: shapes.pillars(N, A, S.hours, S.peakHour),
-    cam: { pos: [0, 2.4, 7.6], look: [0, 0.05, 0], orbit: 0.5, speed: 0.2 },
+    cam: { pos: [0, 2.6, 9.4], look: [0, 0.75, -0.4], orbit: 0.3, speed: 0.2 },
     words(ctx, t) {
       shade(ctx)
       eyebrow(ctx, 'Jam kalian', 250, MUTED, at(t, late))
@@ -259,14 +259,14 @@ export function makeStory(S, N, theme) {
   add({
     duration: 7,
     shape: shapes.terrain(N, A, S.calendar, S.busiest),
-    cam: { pos: [0, 2.7, 6.4], look: [0, -0.15, 0.1], orbit: 0.3, speed: 0.18 },
+    cam: { pos: [3.6, 1.7, 4.4], look: [-0.4, 0.2, 0], orbit: 0.25, speed: 0.2, dolly: 0.02 },
     words(ctx, t) {
       shade(ctx)
       eyebrow(ctx, 'Setiap hari', 250, MUTED, at(t, late))
       text(ctx, num(S.activeDays), M, 430, big(170, { color: FG, alpha: at(t, late + 0.2), rise: 50 }))
       const w = measure(ctx, num(S.activeDays), big(170))
       text(ctx, `dari ${num(S.spanDays)} hari`, M + w + 24, 430, head(40, { color: MUTED, alpha: at(t, late + 0.4) }))
-      text(ctx, 'Satu gelombang tiap bulan.', M, 500, { size: 30, color: MUTED, alpha: at(t, late + 0.6) })
+      text(ctx, 'Satu menara tiap hari, setahun terakhir.', M, 500, { size: 30, color: MUTED, alpha: at(t, late + 0.6) })
       text(ctx, 'HARI PALING RAME', M, 1470, { size: 24, family: MONO, weight: 500, spacing: 3, color: MUTED, alpha: at(t, late + 1) })
       text(ctx, `${date(S.busiest.date)} · ${num(S.busiest.n)} pesan`, M, 1530, head(50, { color: theme.accent, alpha: at(t, late + 1.1) }))
       if (S.streak.length > 2) {
@@ -285,8 +285,8 @@ export function makeStory(S, N, theme) {
     const cols = P.slice(0, S.group ? 3 : 2)
     add({
       duration: 7,
-      shape: shapes.words(N, A, word, { width: 1.85 }),
-      cam: { pos: [0, -0.2, 6.2], look: [0, 0.15, 0], orbit: 0.16, speed: 0.3 },
+      shape: shapes.words(N, A, word, { width: 2.1 }),
+      cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, V.words, 250, MUTED, at(t, late))
@@ -309,7 +309,7 @@ export function makeStory(S, N, theme) {
     add({
       duration: 6.5,
       shape: shapes.emoji(N, A, fav[0]),
-      cam: { pos: [0, 0.1, 6.2], look: [0, 0.25, 0], orbit: 0.35, speed: 0.45 },
+      cam: { pos: [0, 1.9, 8], look: [0, 1.2, 0], orbit: 0.3, speed: 0.3 },
       words(ctx, t) {
         shade(ctx)
         eyebrow(ctx, V.emoji, 250, MUTED, at(t, late))
@@ -341,7 +341,7 @@ export function makeStory(S, N, theme) {
   add({
     duration: 8,
     shape: shapes.galaxy(N, A),
-    cam: { pos: [0, 3.6, 5.2], look: [0, -0.75, 0], orbit: 0.6, speed: 0.15 },
+    cam: { pos: [0, 4.6, 9.4], look: [0, -0.1, 0], orbit: 0.6, speed: 0.15 },
     words(ctx, t) {
       shade(ctx)
       eyebrow(ctx, `${years(S)} dalam angka`, 250, MUTED, at(t, late))

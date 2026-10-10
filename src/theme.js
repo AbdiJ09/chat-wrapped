@@ -82,7 +82,7 @@ export function detectTheme(stats, text) {
   return 'squad'
 }
 
-/** Linear RGB triplets for the particles. */
+/** Linear RGB triplets for the 3D. */
 export function linear(hex) {
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {

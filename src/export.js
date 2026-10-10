@@ -23,6 +23,9 @@ export async function slideImage(story, i) {
   return new Promise((resolve) => c.toBlob(resolve, 'image/png'))
 }
 
+const STALL = 6000 // ms
+const STALLED = 'Browser ini berhenti di tengah bikin video. Coba pakai Chrome, atau simpan gambarnya saja.'
+
 async function pickCodec(fps) {
   for (const codec of ['avc1.640028', 'avc1.4d0028', 'avc1.42003e']) {
     const config = { codec, width: W, height: H, bitrate: 7_000_000, framerate: fps }
@@ -44,7 +47,10 @@ export async function storyVideo(story, { fps = 30, onProgress, signal = {} } = 
   if (!config) throw new Error('Browser ini belum bisa bikin video. Coba Chrome terbaru, atau simpan gambarnya saja.')
   const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H, frameRate: fps }, fastStart: 'in-memory' })
   let failure = null
-  const encoder = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => (failure = e) })
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    error: (e) => (failure = e),
+  })
   encoder.configure(config)
 
   const { c, ctx, restore } = stage(story)
@@ -61,12 +67,17 @@ export async function storyVideo(story, { fps = 30, onProgress, signal = {} } = 
         encoder.encode(frame, { keyFrame: f % (fps * 2) === 0 })
         frame.close()
         f++
-        // don't race ahead of the encoder; let the page breathe now and then
-        while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 4))
-        if (f % 6 === 0) {
-          onProgress?.(f / total)
-          await new Promise((r) => setTimeout(r, 0))
+        // don't race ahead of the encoder, but don't wait for it for ever either: some browsers
+        // (seen with Safari) can stall without a word, and 0% for ever looks like nothing at all
+        const since = performance.now()
+        while (encoder.encodeQueueSize > 6) {
+          if (failure) throw failure
+          if (performance.now() - since > STALL) throw new Error(STALLED)
+          await new Promise((r) => setTimeout(r, 4))
         }
+        onProgress?.(f / total)
+        // let the page breathe now and then
+        if (f % 6 === 0) await new Promise((r) => setTimeout(r, 0))
       }
     }
     await encoder.flush()

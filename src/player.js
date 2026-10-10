@@ -1,14 +1,12 @@
 import { W, H } from './story/draw.js'
 
 // Plays the story like an Instagram story: progress bars, tap right/left to skip, hold to pause.
-// Each frame: the 3D engine draws the particles, then the slide's words go on top, all into one
+// Each frame: the 3D engine draws the bubbles, then the slide's words go on top, all into one
 // 1080 × 1920 canvas — the same canvas that gets saved as an image or recorded as video.
 
 export function compose(ctx, story, i, t) {
   const { engine, slides } = story
-  let time = t
-  for (let k = 0; k < i; k++) time += slides[k].duration
-  engine.render(i, t, time)
+  engine.render(i, t)
   ctx.drawImage(engine.canvas, 0, 0, W, H)
   slides[i].words(ctx, t)
 }
@@ -64,6 +62,8 @@ export class Player {
   frame(now) {
     if (!this.alive) return
     requestAnimationFrame(this.frame)
+    // while a video or an image is being made the engine is theirs: don't draw over it
+    if (this.paused) return
     const dt = Math.min((now - this.last) / 1000, 0.1)
     this.last = now
     if (this.playing && !this.held && !this.paused) {

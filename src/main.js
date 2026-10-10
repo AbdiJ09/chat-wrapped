@@ -5,7 +5,8 @@ import { makeStory } from './story/slides.js'
 import { Player } from './player.js'
 import { slideImage, storyVideo, canMakeVideo } from './export.js'
 import { Engine } from './three/engine.js'
-import { Tunnel } from './three/tunnel.js'
+import { Stage } from './stage.js'
+import { Drum } from './drum.js'
 import { nebula, authors } from './three/shapes.js'
 import { THEMES, THEME_LIST, detectTheme } from './theme.js'
 import { demoMessages, formatExport } from './demo.js'
@@ -13,18 +14,18 @@ import { demoMessages, formatExport } from './demo.js'
 // Everything happens on this page: the chat is read, counted and drawn in the browser, and
 // never sent anywhere.
 //
-//   landing   a tunnel of chat bubbles; the vibe cards recolour it
-//   picker    "what kind of chat is this?" (guessed, changeable), the tunnel in that theme
-//   story     the 3D film; warp + flash on the way in
+//   landing   the 3D studio playing the demo chat; each part of the page has its own sculpture,
+//             the vibes recolour it
+//   picker    "what kind of chat is this?" (guessed, changeable), your own chat in the studio
+//   story     the 3D film; the bubbles fly up, a flash, and they rain down into the film
 
 const $ = (id) => document.getElementById(id)
 const landing = $('landing')
 const picker = $('picker')
 const storyView = $('story')
 const fileInput = $('file')
-const note = $('note')
 const mobile = matchMedia('(pointer: coarse)').matches
-const N = mobile ? 16000 : 30000
+const N = mobile ? 1200 : 2400
 const dpr = Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.75)
 
 const fontsReady = Promise.all([
@@ -44,52 +45,266 @@ function paint(theme) {
   document.querySelector('meta[name="theme-color"]').content = theme.bg
 }
 
-// — the tunnel (landing and picker) —
-const tunnel = new Tunnel($('tunnel'), { count: mobile ? 200 : 380, theme: THEMES.bestie })
-let tunnelOn = true
+// — the studio (landing and picker), playing the demo until you pick your own chat —
+const demoText = formatExport(demoMessages(), 'android-id')
+const demoStats = () => analyse(demoText, null).stats
+// lighter than the film (no depth of field, a smaller mirror), so it never drops frames
+const sceneNames = [...document.querySelectorAll('.scene')].map((s) => s.dataset.scene)
+const stage = new Stage($('stage'), { count: mobile ? 900 : 1800, quality: mobile ? 0.4 : 0.55, stats: demoStats(), theme: THEMES.bestie, scenes: sceneNames })
+let stageOn = true
+// the resolution adapts: if frames run long, draw fewer pixels
+let pr = 1
+let slow = 0
 let last = performance.now()
-function tunnelFrame(now) {
-  requestAnimationFrame(tunnelFrame)
+function stageFrame(now) {
+  requestAnimationFrame(stageFrame)
   const dt = Math.min((now - last) / 1000, 0.1)
   last = now
-  if (!tunnelOn) return
-  tunnel.resize(innerWidth, innerHeight, dpr)
-  tunnel.update(dt)
+  if (!stageOn) return
+  slow = slow * 0.95 + (dt > 0.021 ? 1 : 0) * 0.05
+  if (slow > 0.5 && pr > 0.6) {
+    pr = Math.max(0.6, pr - 0.2)
+    slow = 0
+  }
+  // the cursor's parallax for the words (the studio's camera leans the same way)
+  const r = document.documentElement.style
+  r.setProperty('--px', stage.mouse.x.toFixed(3))
+  r.setProperty('--py', (-stage.mouse.y).toFixed(3))
+  if (!landing.hidden) stage.target = scrollY / (deck[0].offsetHeight || innerHeight)
+  stage.frame(now, innerWidth, innerHeight, pr)
+  if (!landing.hidden) motion()
 }
-requestAnimationFrame(tunnelFrame)
+requestAnimationFrame(stageFrame)
+
+// — the landing: scenes of one screen each, everything moving with the scroll —
+// every title is split into letters (inside unbreakable words), each with its place in line (--k)
+function split(el) {
+  const letters = []
+  const walk = (node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const frag = document.createDocumentFragment()
+        child.textContent.split(/(\s+)/).forEach((part) => {
+          if (!part) return
+          if (/^\s+$/.test(part)) return frag.append(' ')
+          const w = document.createElement('span')
+          w.className = 'w'
+          for (const c of part) {
+            const ch = document.createElement('span')
+            ch.className = 'ch'
+            ch.textContent = c
+            letters.push(ch)
+            w.append(ch)
+          }
+          frag.append(w)
+        })
+        child.replaceWith(frag)
+      } else walk(child)
+    }
+  }
+  walk(el)
+  // each letter's own way of coming apart: where it flies (em, px towards you) and how it turns (deg)
+  const r = (a, b) => (a + Math.random() * (b - a)).toFixed(2)
+  letters.forEach((ch, i) => {
+    ch.style.setProperty('--k', (i / Math.max(1, letters.length - 1)).toFixed(3))
+    ch.style.cssText += `;--sx:${r(-2.6, 2.6)};--sy:${r(-1.8, 1.4)};--sz:${r(250, 900)};--rx:${r(-160, 160)};--ry:${r(-200, 200)};--rz:${r(-90, 90)}`
+  })
+}
+for (const el of document.querySelectorAll('[data-split]')) split(el)
+document.querySelectorAll('.steps li').forEach((li, i, all) => li.style.setProperty('--k', i / (all.length - 1)))
+
+// labels that decode like a cipher: random characters settling into the words, left to right
+const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+<>/'
+function decode(el, ms = 700) {
+  const text = (el.dataset.text ??= el.textContent)
+  const t0 = performance.now()
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / ms)
+    const fixed = Math.floor(k * text.length)
+    el.textContent = text.slice(0, fixed) + [...text.slice(fixed)].map((c) => (c === ' ' ? ' ' : GLYPHS[Math.floor(Math.random() * GLYPHS.length)])).join('')
+    if (k < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+const deck = [...document.querySelectorAll('.scene')]
+let at = 0
+const restart = (el, cls) => {
+  el.classList.remove(cls)
+  void el.offsetWidth
+  el.classList.add(cls)
+}
+// the scene across the middle of the screen: its label decodes
+function arrive(i) {
+  if (i < 0 || view !== 'landing') return
+  const changed = i !== at
+  at = i
+  if (changed) for (const el of deck[i].querySelectorAll('[data-decode]')) decode(el)
+  // the vibes' drum turns by itself while it's showing; leave it and the landing's own colours come back
+  const vibes = deck[i].dataset.scene === 'cover'
+  vibeDrum.play(vibes)
+  if (!vibes && stage.theme !== THEMES.bestie) {
+    setTheme(THEMES.bestie)
+    vibeDrum.set(THEME_LIST.indexOf(THEMES.bestie), { silent: true })
+  }
+}
+const watcher = new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) arrive(deck.indexOf(e.target))
+}, { rootMargin: '-45% 0px -45% 0px' })
+for (const el of deck) watcher.observe(el)
+
+// — data floating in the studio, at different depths: the further, the faster it slides past —
+const DEMO = demoStats()
+{
+  const S = DEMO
+  const P = S.people
+  const pct = (p) => `${Math.round(p.share * 100)}%`
+  const fav = P.flatMap((p) => p.topEmoji).sort((a, b) => b[1] - a[1])[0]
+  const short = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' })
+  const chips = {
+    badge: [['pesan', S.total.toLocaleString('id-ID')], ['hari', S.spanDays], [`${P[0].name} & ${P[1].name}`, 'contoh']],
+    orbs: [[P[0].name, pct(P[0])], [P[1].name, pct(P[1])], ['selisih', `${Math.abs(P[0].messages - P[1].messages).toLocaleString('id-ID')} pesan`]],
+    pillars: [['jam paling rame', `${String(S.peakHour).padStart(2, '0')}.00`], ['lewat tengah malam', `${Math.round(S.nightShare * 100)}%`]],
+    terrain: [['hari ngobrol', S.activeDays], ['paling rame', `${short.format(S.busiest.date)} · ${S.busiest.n}`], ['rekor', `${S.streak.length} hari`]],
+    emoji: [[fav?.[0] ?? '💬', `${fav?.[1] ?? 0}×`], ['ketawa', `${S.laughs.toLocaleString('id-ID')}×`]],
+    galaxy: [['adegan', '11'], ['video', '1080×1920'], ['frame', '30/detik']],
+    cover: [['vibe', '5 pilihan'], ['tebakan', 'otomatis']],
+    spark: [['di-upload', '0 byte'], ['diproses', 'di browsermu']],
+  }
+  // places around the sculpture (left %, top %, depth); deeper ones move more
+  const spots = [[58, 20, 1.7], [80, 62, 0.6], [64, 78, 1.2]]
+  for (const scene of deck) {
+    for (const [i, [label, value]] of (chips[scene.dataset.scene] ?? []).entries()) {
+      const [x, y, d] = spots[i]
+      const c = document.createElement('div')
+      c.className = 'chip'
+      c.dataset.i = i
+      c.style.cssText = `--x:${x}%;--y:${y}%;--depth:${d}`
+      c.innerHTML = `<i></i><b>${value}</b><span>${label}</span>`
+      scene.append(c)
+    }
+  }
+}
+
+// — every frame: each scene's place relative to the screen (from the 3D's eased scroll, so words
+// and bubbles move as one), and how fast the page is moving —
+// the first scene assembles itself once the fonts are in (1.6 s, by the clock: a slow first frame mustn't stretch it)
+let introAt = Infinity
+fontsReady.then(() => (introAt = performance.now()))
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+function motion() {
+  const intro = clamp((1 - (performance.now() - introAt) / 1600), 0, 1)
+  const r = document.documentElement.style
+  r.setProperty('--v', clamp((stage.target - stage.pos) * 2.5, -1, 1).toFixed(3))
+  for (const [i, el] of deck.entries()) {
+    const p = i - stage.pos // −1 above … 0 filling the screen … +1 below
+    if (Math.abs(p) > 1.6) continue
+    // how far apart it has come: 0 in place, 1 scattered (eased in)
+    let a = clamp(Math.abs(p) * 1.3, 0, 1)
+    if (i === 0) a = Math.max(a, 1 - (1 - intro) ** 3)
+    el.style.setProperty('--p', p.toFixed(4))
+    el.style.setProperty('--a', (a * a * (3 - 2 * a)).toFixed(4))
+    el.style.setProperty('--s', p > 0 ? -1 : 1) // coming: from deep inside; going: past your face
+  }
+}
+
+// — the composer: picking your chat, like attaching a file in a chat, always at the bottom —
+// Idle, it types its own hints, one after another; it changes when you hover, drag a file over
+// the page, while it reads, and when something's wrong.
+const composer = $('composer')
+const composerText = $('composer-text')
+const HINTS = ['Lampirkan export chat WhatsApp kalian…', 'File .txt atau .zip, tanpa media…', 'Nggak di-upload. Dibaca di sini aja…', 'Klik di sini, atau seret file-nya ke mana aja…']
+let typing = null
+function typeHints() {
+  clearTimeout(typing)
+  let n = 0
+  let k = 0
+  let back = false
+  const step = () => {
+    const line = HINTS[n % HINTS.length]
+    if (!back) {
+      composerText.textContent = line.slice(0, ++k)
+      if (k < line.length) typing = setTimeout(step, 28 + Math.random() * 40)
+      else {
+        back = true
+        typing = setTimeout(step, 2400)
+      }
+    } else {
+      composerText.textContent = line.slice(0, --k)
+      if (k > 0) typing = setTimeout(step, 14)
+      else {
+        back = false
+        n++
+        typing = setTimeout(step, 350)
+      }
+    }
+  }
+  step()
+}
+/** state: '' (typing its hints), 'hover', 'drop', 'busy', 'error', 'play' (on the picker) */
+function composerSay(text, state = '') {
+  composer.dataset.state = state
+  if (!state) return typeHints()
+  clearTimeout(typing)
+  composerText.textContent = text
+}
+// on the picker it plays the film (the paperclip still takes another file)
+function composerPlay() {
+  composerSay(`Putar film ${whoOf(chat.stats)}`, 'play')
+}
+composer.addEventListener('click', (e) => {
+  const state = composer.dataset.state
+  if (state === 'busy' || state === 'saving') return
+  if (state === 'save') return openSheet(!sheet.classList.contains('is-open'))
+  if (state === 'play' && !e.target.closest('.composer__clip')) play()
+  else fileInput.click()
+})
+composer.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), composer.click()))
+composer.addEventListener('pointerenter', () => !composer.dataset.state && composerSay('Pilih file chat kalian', 'hover'))
+composer.addEventListener('pointerleave', () => composer.dataset.state === 'hover' && composerSay())
+fontsReady.then(() => composerSay())
+
+// the hero's messages: each one "typing…" first, then the words
+fontsReady.then(() => {
+  document.querySelectorAll('.msg').forEach((m, i) => {
+    setTimeout(() => m.classList.add('is-on'), 700 + i * 1500)
+    setTimeout(() => m.classList.add('is-typed'), 1500 + i * 1500)
+  })
+})
+
+// — buttons lean towards the cursor —
+for (const b of document.querySelectorAll('.button--primary, .button--ghost')) {
+  b.addEventListener('pointermove', (e) => {
+    const r = b.getBoundingClientRect()
+    b.style.setProperty('--mx', `${((e.clientX - r.left) / r.width - 0.5) * 10}px`)
+    b.style.setProperty('--my', `${((e.clientY - r.top) / r.height - 0.5) * 8}px`)
+  })
+  b.addEventListener('pointerleave', () => {
+    b.style.removeProperty('--mx')
+    b.style.removeProperty('--my')
+  })
+}
+// which screen we're on (or heading to), and a count of moves so an overtaken transition stops
+let view = 'landing'
+let moves = 0
 function setTheme(theme) {
-  tunnel.setTheme(theme)
+  stage.setTheme(theme)
   paint(theme)
 }
 paint(THEMES.bestie)
 
-// — vibe cards —
-function vibeCard(theme, { auto = false, onPick } = {}) {
-  const b = document.createElement('button')
-  b.className = 'vibe'
-  b.style.setProperty('--c1', theme.people[0])
-  b.innerHTML = `${auto ? '<span class="vibe__auto">tebakan kami</span>' : ''}<span class="vibe__emoji">${theme.emoji}</span><span class="vibe__name">${theme.name}</span><span class="vibe__blurb">${theme.blurb}</span><span class="vibe__swatches">${theme.people.slice(0, 4).map((c) => `<i style="background:${c}"></i>`).join('')}</span>`
-  b.addEventListener('pointerenter', () => setTheme(theme))
-  b.addEventListener('focus', () => setTheme(theme))
-  b.addEventListener('click', () => onPick?.(theme))
-  return b
-}
-for (const theme of THEME_LIST) {
-  $('vibe-list').append(vibeCard(theme, { onPick: (t) => {
+// — the vibes: a drum on the landing (turning by itself while it's showing), another on the picker —
+const vibeDrum = new Drum($('vibe-drum'), THEME_LIST, { onChange: setTheme })
+vibeDrum.set(THEME_LIST.indexOf(THEMES.bestie), { silent: true })
+const pickerDrum = new Drum($('picker-drum'), THEME_LIST, {
+  wheel: true,
+  onChange: (t) => {
+    chat.theme = t
     setTheme(t)
-    for (const el of $('vibe-list').children) el.classList.toggle('is-on', el.querySelector('.vibe__name').textContent === t.name)
-  } }))
-}
-$('vibe-list').addEventListener('pointerleave', () => {
-  const on = [...$('vibe-list').children].find((el) => el.classList.contains('is-on'))
-  if (!on) setTheme(THEMES.bestie)
+  },
 })
 
 // — reading a chat —
-function error(message) {
-  note.textContent = message
-  note.classList.add('is-error')
-}
 
 // "WhatsApp Chat with Nadia.txt", "Chat WhatsApp dengan Liburan.zip", "WhatsApp Chat - Nadia.zip"
 function titleFrom(filename) {
@@ -118,41 +333,146 @@ function analyse(text, title) {
   return { stats, guess: detectTheme(stats, text) }
 }
 
-function showPicker({ stats, guess }) {
-  chat = { stats, theme: THEMES[guess] }
-  landing.hidden = true
-  picker.hidden = false
-  scrollTo(0, 0)
-  $('picker-count').textContent = `${stats.total.toLocaleString('id-ID')} pesan · ${stats.people.length} orang`
-  const list = $('picker-list')
-  list.innerHTML = ''
-  for (const theme of THEME_LIST) {
-    const card = vibeCard(theme, {
-      auto: theme.id === guess,
-      onPick: (t) => {
-        chat.theme = t
-        setTheme(t)
-        for (const el of list.children) el.classList.toggle('is-on', el === card)
-      },
-    })
-    if (theme.id === guess) card.classList.add('is-on')
-    list.append(card)
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// a number counting up to n (in id-ID), easing out
+function count(el, n, ms, done) {
+  const t0 = performance.now()
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / ms)
+    el.textContent = Math.round(n * (1 - (1 - k) ** 4)).toLocaleString('id-ID')
+    if (k < 1) requestAnimationFrame(step)
+    else done?.()
   }
-  // leaving a card puts the chosen theme back
-  list.onpointerleave = () => setTheme(chat.theme)
-  setTheme(chat.theme)
+  requestAnimationFrame(step)
+}
+const whoOf = (S) => (S.group ? S.title ?? `${S.people.length} orang` : `${S.people[0].name} & ${S.people[1].name}`)
+
+// a value eased from a to b over ms, handed to fn each frame; resolves when done
+function tween(a, b, ms, fn, curve = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2)) {
+  return new Promise((resolve) => {
+    const t0 = performance.now()
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / ms)
+      fn(a + (b - a) * curve(k))
+      if (k < 1) requestAnimationFrame(step)
+      else resolve()
+    }
+    requestAnimationFrame(step)
+  })
+}
+
+/*
+ * After you pick your chat — one thing at a time:
+ *   send     the composer shrinks to a point of light and floats up to the middle; the page fades
+ *   gather   every bubble is drawn into one ball there, the camera comes close, the edges darken;
+ *            one quiet line counts your messages
+ *   breathe  the ball pulses with the reading, faster and tighter
+ *   hush     the line goes; the ball presses in once more; a beat of nothing
+ *   bang     it bursts: all at once, outwards, a flash and a ring of light, the camera thrown back,
+ *            and the bubbles brake into your chat's own sculpture
+ *   title    your names, letter by letter, like a film's title card
+ *   land     the title flies up into the picker's corner; the picker builds in round it
+ */
+async function showPicker({ stats, guess }) {
+  view = 'picker'
+  const move = ++moves
+  const theme = THEMES[guess]
+  chat = { stats, theme }
+  const e = stage.engine
+  const gone = () => move !== moves
+  // send
+  composer.classList.remove('is-away')
+  restart(composer, 'is-sending')
+  if (!landing.hidden) landing.classList.add('is-leaving')
+  if (!picker.hidden) picker.classList.add('is-leaving')
+  document.body.classList.add('is-reading')
+  // gather
+  stage.setStats(stats)
+  stage.focus = 'centre'
+  stage.show('core', { force: true, style: 'gather' })
+  await wait(350)
+  const reading = $('reading')
+  reading.hidden = false
+  restart(reading, 'is-on')
+  count($('reading-count'), stats.total, 1700)
+  tween(0, 1, 1750, (v) => ($('reading-bar').style.transform = `scaleX(${v})`))
+  // breathe: in and out, quicker each time
+  for (const [to, ms] of [[0.84, 380], [1.04, 300], [0.8, 260], [1.03, 220], [0.78, 200], [1, 180]]) {
+    await tween(e.squeeze, to, ms, (v) => (e.squeeze = v))
+    if (gone()) return
+  }
+  // hush
+  reading.classList.add('is-out')
+  await tween(e.squeeze, 0.62, 260, (v) => (e.squeeze = v))
+  await wait(140)
+  if (gone()) return
+  // bang
+  e.squeeze = 1
+  $('flash').classList.add('is-soft')
+  restart($('flash'), 'is-on')
+  paint(theme)
+  stage.show('cover', { theme, style: 'bang' })
+  composer.classList.remove('is-sending')
+  composer.classList.add('is-away')
+  landing.classList.remove('is-leaving')
+  picker.classList.remove('is-leaving')
+  landing.hidden = true
+  picker.hidden = true
+  reading.hidden = true
+  document.body.classList.remove('is-reading')
+  await wait(550)
+  if (gone()) return
+  // title
+  const card = $('reveal')
+  const who = $('reveal-who')
+  who.textContent = whoOf(stats)
+  split(who)
+  const since = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(stats.start)
+  $('reveal-meta').textContent = `${stats.total.toLocaleString('id-ID')} pesan · ${stats.spanDays.toLocaleString('id-ID')} hari · sejak ${since}`
+  card.hidden = false
+  restart(card, 'is-on')
+  await wait(1500)
+  if (gone()) return
+  // land: the picker is laid out (unseen), the title flies to where its name sits, then it builds in
+  $('picker-who').textContent = whoOf(stats)
+  const since2 = new Intl.DateTimeFormat('id-ID', { month: 'short', year: 'numeric' }).format(stats.start)
+  $('picker-stats').innerHTML = [['pesan', stats.total], ['hari', stats.spanDays], ['orang', stats.people.length], ['sejak', since2]]
+    .map(([label, v], i) => `<div style="--k:${i / 3}"><dt>${label}</dt><dd data-n="${typeof v === 'number' ? v : ''}">${typeof v === 'number' ? 0 : v}</dd></div>`).join('')
+  pickerDrum.guess(guess)
+  pickerDrum.set(THEME_LIST.indexOf(theme), { silent: true })
+  picker.classList.add('is-prep')
+  picker.hidden = false
+  const from = who.getBoundingClientRect()
+  const to = $('picker-who').getBoundingClientRect()
+  stage.focus = 'side'
+  card.classList.add('is-landing')
+  who.animate(
+    [{ transform: 'none' }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.height / from.height})` }],
+    { duration: 750, easing: 'cubic-bezier(0.7, 0, 0.2, 1)', fill: 'forwards' },
+  )
+  await wait(620)
+  if (gone()) return
+  picker.classList.remove('is-prep')
+  restart(picker, 'is-entering')
+  for (const dd of $('picker-stats').querySelectorAll('[data-n]:not([data-n=""])')) setTimeout(() => count(dd, +dd.dataset.n, 1200), 400)
+  await wait(200)
+  card.hidden = true
+  who.getAnimations().forEach((a) => a.cancel())
+  card.classList.remove('is-on', 'is-landing')
+  composer.classList.remove('is-away')
+  composerPlay()
 }
 
 async function handle(file) {
   if (!file) return
-  note.classList.remove('is-error')
-  note.textContent = 'Membaca chat…'
+  composerSay(`Membaca ${file.name}…`, 'busy')
   try {
-    showPicker(analyse(await readChat(file), titleFrom(file.name)))
-    note.textContent = ''
+    await showPicker(analyse(await readChat(file), titleFrom(file.name)))
   } catch (err) {
     console.error(err)
-    error(err instanceof ChatFormatError ? 'Ini bukan file export chat WhatsApp. Pilih file .txt atau .zip hasil "Ekspor chat".' : err.message)
+    composerSay(err instanceof ChatFormatError ? 'Itu bukan export chat WhatsApp. Pakai .txt / .zip hasil "Ekspor chat".' : err.message, 'error')
+    setTimeout(() => composer.dataset.state === 'error' && (view === 'picker' ? composerPlay() : composerSay()), 5000)
   }
 }
 
@@ -169,23 +489,19 @@ function fitEngine() {
 }
 
 async function play() {
+  if (!chat) return
+  view = 'story'
+  moves++
   await fontsReady
   const { stats, theme } = chat
-  // into hyperspace…
-  const t0 = performance.now()
-  await new Promise((resolve) => {
-    const ramp = (now) => {
-      const k = Math.min(1, (now - t0) / 1100)
-      tunnel.warp = k * k
-      if (k < 1) requestAnimationFrame(ramp)
-      else resolve()
-    }
-    requestAnimationFrame(ramp)
-  })
-  $('flash').classList.remove('is-on')
-  void $('flash').offsetWidth
-  $('flash').classList.add('is-on')
-  engine ??= new Engine({ count: N })
+  // everything lifts off into the sky…
+  composerSay('Menyiapkan film…', 'busy')
+  paint(theme)
+  stage.show('nebula', { theme })
+  await new Promise((resolve) => setTimeout(resolve, 1300))
+  $('flash').classList.remove('is-soft')
+  restart($('flash'), 'is-on')
+  engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
   const slides = makeStory(stats, N, theme)
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
   story = { engine, slides }
@@ -193,50 +509,68 @@ async function play() {
   landing.hidden = true
   storyView.hidden = false
   document.body.classList.add('is-story')
-  tunnelOn = false
-  tunnel.warp = 0
+  stageOn = false
   fitEngine()
   player?.destroy()
   player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story })
   $('save-video').hidden = !canMakeVideo()
+  composerSay(SAVE, 'save')
   scrollTo(0, 0)
 }
 
 function back() {
+  view = 'landing'
+  moves++
   player?.destroy()
   player = null
   story = null
   chat = null
   storyView.hidden = true
   picker.hidden = true
+  $('reading').hidden = true
+  $('reveal').hidden = true
+  document.body.classList.remove('is-reading')
+  composer.classList.remove('is-sending', 'is-away')
   landing.hidden = false
   document.body.classList.remove('is-story')
   fileInput.value = ''
-  tunnelOn = true
-  setTheme(THEMES.bestie)
+  stageOn = true
+  // back where you were on the landing, with the demo again
+  stage.setStats(demoStats())
+  stage.focus = 'side'
+  paint(THEMES.bestie)
+  stage.theme = THEMES.bestie
+  deck[at].scrollIntoView({ behavior: 'instant' })
+  stage.target = at
+  stage.follow()
+  composerSay()
+}
+// leaving the picker without playing: back to the landing
+async function leavePicker() {
+  const move = ++moves
+  picker.classList.add('is-leaving')
+  await wait(550)
+  picker.classList.remove('is-leaving', 'is-entering')
+  if (move === moves) back()
 }
 
 fileInput.addEventListener('change', () => handle(fileInput.files[0]))
-$('pick').addEventListener('click', () => fileInput.click())
-const demoText = formatExport(demoMessages(), 'android-id')
 $('demo').addEventListener('click', () => {
-  chat = { stats: analyse(demoText, null).stats, theme: THEMES.couple }
+  chat = { stats: demoStats(), theme: THEMES.couple }
   setTheme(chat.theme)
   play()
 })
-$('go').addEventListener('click', play)
-$('cancel').addEventListener('click', back)
+// a file dragged over the page: anywhere will do, the button says so
 addEventListener('dragover', (e) => {
   e.preventDefault()
-  document.body.classList.add('is-dragging')
+  if (view !== 'story' && composer.dataset.state !== 'drop') composerSay('Lepas di sini, langsung dibaca', 'drop')
 })
 addEventListener('dragleave', (e) => {
-  if (!e.relatedTarget) document.body.classList.remove('is-dragging')
+  if (!e.relatedTarget && composer.dataset.state === 'drop') view === 'picker' ? composerPlay() : composerSay()
 })
 addEventListener('drop', (e) => {
   e.preventDefault()
-  document.body.classList.remove('is-dragging')
-  if (!storyView.hidden) return
+  if (view === 'story') return
   handle(e.dataTransfer.files[0])
 })
 addEventListener('resize', () => story && fitEngine())
@@ -266,6 +600,7 @@ frame.addEventListener('pointercancel', () => {
   if (player) player.held = false
 })
 addEventListener('keydown', (e) => {
+  if (view === 'picker' && e.key === 'Escape') return leavePicker()
   if (!player) return
   if (e.key === 'ArrowRight') player.next()
   if (e.key === 'ArrowLeft') player.prev()
@@ -273,7 +608,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault()
     player.playing = !player.playing
   }
-  if (e.key === 'Escape') back()
+  if (e.key === 'Escape') sheet.classList.contains('is-open') ? openSheet(false) : back()
 })
 
 function download(blob, name) {
@@ -299,48 +634,76 @@ async function deliver(blob, name, type) {
   download(blob, name)
 }
 
-async function busy(button, label, job) {
-  const was = button.textContent
-  button.disabled = true
-  button.textContent = label
+// — under the film: the composer says "save", and opens a small sheet of what you can save —
+const sheet = $('sheet')
+const SAVE = 'Simpan film kalian'
+function openSheet(on) {
+  if (on) sheet.hidden = false
+  void sheet.offsetWidth
+  sheet.classList.toggle('is-open', on)
+  composer.classList.toggle('is-open', on)
+  if (!on) setTimeout(() => sheet.classList.contains('is-open') || (sheet.hidden = true), 450)
+}
+addEventListener('pointerdown', (e) => {
+  if (sheet.classList.contains('is-open') && !e.target.closest('#sheet, #composer')) openSheet(false)
+})
+const bar = composer.querySelector('.composer__bar')
+// one job at a time, its progress told in the composer (p: 0…1 fills its line)
+async function saving(label, job) {
+  if (!player || composer.dataset.state === 'saving') return
+  openSheet(false)
   player.paused = true
+  composerSay(label, 'saving')
+  bar.style.transform = 'scaleX(0)'
   try {
-    await job((text) => (button.textContent = text))
+    await job((text, p) => {
+      composerText.textContent = text
+      if (p != null) bar.style.transform = `scaleX(${p})`
+    })
+    composerSay('Tersimpan', 'saving')
+    bar.style.transform = 'scaleX(1)'
+    await wait(1200)
   } catch (err) {
     console.error(err)
-    alert(err.message)
+    composerSay(err.message, 'error')
+    await wait(4500)
   } finally {
-    button.disabled = false
-    button.textContent = was
     if (player) player.paused = false
+    bar.style.transform = ''
+    if (view === 'story') composerSay(SAVE, 'save')
   }
 }
 
-$('save').addEventListener('click', () => {
-  if (!player) return
-  busy($('save'), 'Menyimpan…', async () => {
+$('save').addEventListener('click', () =>
+  saving('Menyimpan gambar…', async () => {
     const blob = await slideImage(story, player.i)
     await deliver(blob, `chat-wrapped-${pad(player.i + 1)}.png`, 'image/png')
-  })
-})
-$('save-all').addEventListener('click', () => {
-  if (!player) return
-  busy($('save-all'), 'Menyiapkan…', async () => {
+  }))
+$('save-all').addEventListener('click', () =>
+  saving('Menyiapkan semua gambar…', async (say) => {
     const files = {}
     for (let i = 0; i < story.slides.length; i++) {
       const blob = await slideImage(story, i)
       files[`chat-wrapped-${pad(i + 1)}.png`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }]
+      say(`Menyiapkan gambar ${i + 1} dari ${story.slides.length}…`, (i + 1) / story.slides.length)
     }
     download(new Blob([zipSync(files)], { type: 'application/zip' }), 'chat-wrapped.zip')
-  })
-})
-$('save-video').addEventListener('click', () => {
-  if (!player) return
-  busy($('save-video'), 'Bikin video 0%', async (say) => {
-    const blob = await storyVideo(story, { onProgress: (p) => say(`Bikin video ${Math.round(p * 100)}%`) })
+  }))
+$('save-video').addEventListener('click', () =>
+  saving('Bikin video…', async (say) => {
+    // how far, and roughly how long to go (from how fast it's been so far)
+    const t0 = performance.now()
+    const blob = await storyVideo(story, {
+      onProgress: (p) => {
+        const left = p > 0.03 ? ((performance.now() - t0) / p) * (1 - p) / 1000 : null
+        say(`Bikin video ${Math.floor(p * 100)}%${left == null ? '' : left > 60 ? ` · ±${Math.ceil(left / 60)} menit lagi` : ` · ±${Math.ceil(left / 5) * 5} detik lagi`}`, p)
+      },
+    })
     if (blob) await deliver(blob, 'chat-wrapped.mp4', 'video/mp4')
-  })
+  }))
+$('again').addEventListener('click', () => {
+  openSheet(false)
+  back()
 })
-$('again').addEventListener('click', back)
 
-if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, tunnel, analyse, showPicker, play, demoText, storyVideo, slideImage, THEMES, setChat: (c) => (chat = c) }
+if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, THEMES, setChat: (c) => (chat = c) }

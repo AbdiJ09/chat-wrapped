@@ -12,55 +12,126 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <canvas id="tunnel" class="tunnel" aria-hidden="true"></canvas>
+    <canvas id="stage" class="stage" aria-hidden="true"></canvas>
+    <div class="scrim" aria-hidden="true"></div>
 
     <main id="landing" class="landing">
       <header class="bar">
         <span class="logo">chat<b>wrapped</b></span>
-        <span class="bar__note">100% di browsermu</span>
       </header>
 
-      <section class="hero">
-        <p class="tag"><span class="dot"></span> WhatsApp → film 3D</p>
-        <h1 class="hero__title"><span>Chat kalian,</span><span class="hero__accent">jadi film.</span></h1>
-        <p class="lede">Masukin export chat WhatsApp. Keluar film 3D tentang kalian: siapa yang nyapa duluan, siapa paling cepet bales, jam paling rame, kata-kata khas. Simpan jadi video buat story.</p>
-        <div class="actions">
-          <button id="pick" class="button">Pilih file chat</button>
-          <button id="demo" class="button button--ghost">Lihat contoh</button>
+      <section class="scene hero" data-scene="badge" data-cta="Pilih file chat" data-label="Mulai">
+        <div class="col">
+          <p class="tag"><span class="dot"></span> <span data-decode>WhatsApp → film 3D</span></p>
+          <h1 class="hero__title" data-split><span>Chat kalian,</span><span class="hero__accent">jadi film.</span></h1>
+          <p class="lede body">Ribuan pesan kalian jadi ribuan bubble 3D, yang nyusun diri jadi siapa paling bawel, jam paling rame, sampai kota dari setiap hari kalian. Simpan jadi video buat story.</p>
+          <!-- the way in: a message from us, then the composer at the bottom of the screen -->
+          <div class="thread">
+            <p class="msg"><span class="msg__typing" aria-hidden="true"><i></i><i></i><i></i></span><span class="msg__text">Kirim export chat kalian lewat kolom di bawah, nanti aku jadiin film.</span></p>
+            <p class="msg"><span class="msg__typing" aria-hidden="true"><i></i><i></i><i></i></span><span class="msg__text">Belum yakin? <button id="demo" class="msg__link">Tonton punya Nadia &amp; Raka dulu <span class="msg__play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L9.9 6.7a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg></span></button></span></p>
+          </div>
+          <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
         </div>
-        <p id="note" class="note">Chatnya diproses di HP/laptopmu. Nggak pernah di-upload.</p>
-        <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
-        <a class="scroll" href="#vibes">pilih vibe ↓</a>
       </section>
 
-      <section id="vibes" class="vibes">
-        <h2>Tiap chat punya <em>vibe</em>-nya.</h2>
-        <p class="sub">Arahin ke salah satu, lihat terowongannya ganti warna. Temanya ditebak otomatis dari chat-mu, tapi bisa kamu ganti.</p>
-        <div id="vibe-list" class="vibe-list"></div>
+      <section class="scene chapter" data-scene="orbs" data-cta="Siapa yang paling bawel di chatmu?" data-label="Siapa paling bawel">
+        <span class="ghost" aria-hidden="true">01</span>
+        <div class="col">
+          <p class="chapter__note">Contoh: chat setahun Nadia &amp; Raka (karangan)</p>
+          <p class="eyebrow"><b>01</b> <span data-decode>Siapa paling bawel</span></p>
+          <h2 data-split>Tiap pesan, satu bubble.</h2>
+          <p class="body">Ditumpuk jadi menara, satu per orang. Langsung kelihatan siapa yang paling rajin ngetik.</p>
+        </div>
       </section>
 
-      <section class="how">
-        <h2>Tiga langkah.</h2>
-        <ol class="steps">
-          <li><b>01</b><h3>Export chat</h3><p><span class="os">Android</span> ⋮ → Lainnya → Ekspor chat → Tanpa media.<br /><span class="os">iPhone</span> Ketuk nama → Ekspor Chat → Tanpa Media.</p></li>
-          <li><b>02</b><h3>Masukin ke sini</h3><p>Pilih file .txt atau .zip-nya, atau seret ke halaman ini. Semua dihitung di browser.</p></li>
-          <li><b>03</b><h3>Simpan videonya</h3><p>Video 1080×1920 siap story & reels, atau gambar per slide.</p></li>
-        </ol>
+      <section class="scene chapter" data-scene="pillars" data-cta="Cek jam kalian sendiri" data-label="Jam kalian">
+        <span class="ghost" aria-hidden="true">02</span>
+        <div class="col">
+          <p class="eyebrow"><b>02</b> <span data-decode>Jam kalian</span></p>
+          <h2 data-split>24 pilar, satu per jam.</h2>
+          <p class="body">Ketahuan kalian paling sering ngobrol jam berapa, termasuk yang lewat tengah malam.</p>
+        </div>
       </section>
 
-      <footer class="foot">
-        <span>chat<b>wrapped</b> — dibuat oleh Abi</span>
-        <span>Chatmu nggak pernah keluar dari perangkatmu.</span>
-      </footer>
+      <section class="scene chapter" data-scene="terrain" data-cta="Bangun kota dari chatmu" data-label="Setiap hari">
+        <span class="ghost" aria-hidden="true">03</span>
+        <div class="col">
+          <p class="eyebrow"><b>03</b> <span data-decode>Setiap hari</span></p>
+          <h2 data-split>Setahun jadi satu kota.</h2>
+          <p class="body">Satu menara buat tiap hari. Hari paling rame jadi gedung paling tinggi.</p>
+        </div>
+      </section>
+
+      <section class="scene chapter" data-scene="emoji" data-cta="Cari emoji andalanmu" data-label="Emoji andalan">
+        <span class="ghost" aria-hidden="true">04</span>
+        <div class="col">
+          <p class="eyebrow"><b>04</b> <span data-decode>Emoji andalan</span></p>
+          <h2 data-split>Dirakit dari pesan kalian sendiri.</h2>
+          <p class="body">Bukan gambar stok. Tiap kepingnya pesan yang beneran kalian kirim.</p>
+        </div>
+      </section>
+
+      <section class="scene chapter" data-scene="galaxy" data-cta="Bikin film kalian" data-label="Filmnya">
+        <span class="ghost" aria-hidden="true">05</span>
+        <div class="col">
+          <p class="eyebrow"><b>05</b> <span data-decode>Filmnya</span></p>
+          <h2 data-split>Sebelas adegan, satu film.</h2>
+          <p class="body">1080×1920, siap story &amp; reels. Dirender di browsermu, frame demi frame.</p>
+        </div>
+      </section>
+
+      <section id="vibes" class="scene vibes" data-scene="cover" data-cta="Coba pakai chatmu" data-label="Vibe">
+        <span class="ghost" aria-hidden="true">06</span>
+        <div class="col">
+          <p class="eyebrow"><b>06</b> <span data-decode>Vibe</span></p>
+          <h2 data-split>Tiap chat punya <span class="nowrap"><em>vibe</em>-nya.</span></h2>
+          <p class="body sub">Putar rodanya, lihat studionya ganti suasana. Temanya ditebak otomatis dari chat-mu, tapi bisa kamu ganti.</p>
+          <div id="vibe-drum"></div>
+        </div>
+      </section>
+
+      <section class="scene how" data-scene="spark" data-cta="Pilih file chat" data-label="Caranya">
+        <span class="ghost" aria-hidden="true">07</span>
+        <div class="col">
+          <p class="eyebrow"><b>07</b> <span data-decode>Caranya</span></p>
+          <h2 data-split>Tiga langkah.</h2>
+          <ol class="steps">
+            <li><b>1</b><div><h3>Export chat</h3><p><span class="os">Android</span> ⋮ → Lainnya → Ekspor chat → Tanpa media.<br /><span class="os">iPhone</span> Ketuk nama → Ekspor Chat → Tanpa Media.</p></div></li>
+            <li><b>2</b><div><h3>Masukin ke sini</h3><p>Pilih file .txt atau .zip-nya, atau seret ke halaman ini. Semua dihitung di browser.</p></div></li>
+            <li><b>3</b><div><h3>Simpan videonya</h3><p>Video 1080×1920 siap story &amp; reels, atau gambar per slide.</p></div></li>
+          </ol>
+          <p class="credit">chat<b>wrapped</b> · dibuat oleh Abi · chatmu nggak pernah keluar dari perangkatmu</p>
+        </div>
+      </section>
+
     </main>
 
+    <!-- the composer: where you "send" your chat, always at the bottom of the screen -->
+    <div id="composer" class="composer" role="button" tabindex="0" aria-label="Pilih file chat WhatsApp">
+      <span class="composer__clip" title="Pilih file chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="composer__field"><span id="composer-text" class="composer__text"></span><i class="composer__caret"></i></span>
+      <span class="composer__send"><svg class="composer__play" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L9.9 6.7a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg><svg class="composer__down" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="composer__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="composer__bar"></span>
+    </div>
+
+    <!-- reading your chat: one quiet line under the ball everything is drawn into -->
+    <div id="reading" class="reading" hidden>
+      <p class="reading__line"><span class="dot"></span> Membaca <b id="reading-count">0</b> pesan</p>
+      <i class="reading__bar"><b id="reading-bar"></b></i>
+    </div>
+
+    <!-- …then the blast, and the chat's name like a film's title card -->
+    <div id="reveal" class="reveal" hidden>
+      <h2 id="reveal-who" class="reveal__who"></h2>
+      <p id="reveal-meta" class="reveal__meta"></p>
+    </div>
+
     <section id="picker" class="picker" hidden>
-      <p class="tag"><span class="dot"></span> <span id="picker-count"></span></p>
-      <h2 class="picker__title">Ini chat apa?</h2>
-      <div id="picker-list" class="vibe-list vibe-list--pick"></div>
-      <div class="actions">
-        <button id="go" class="button">Putar filmnya</button>
-        <button id="cancel" class="button button--ghost">Ganti file</button>
+      <div class="col">
+        <p class="tag"><span class="dot"></span> <span id="picker-who"></span></p>
+        <h2 class="picker__title" data-split>Ini chat apa?</h2>
+        <dl id="picker-stats" class="stats"></dl>
+        <div id="picker-drum"></div>
       </div>
     </section>
 
@@ -69,16 +140,16 @@
         <div id="bars" class="bars"></div>
         <canvas id="story-canvas"></canvas>
       </div>
-      <nav class="story__actions">
-        <button id="save-video" class="button button--small">Simpan video</button>
-        <button id="save" class="link">Simpan gambar</button>
-        <button id="save-all" class="link">Simpan semua</button>
-        <button id="again" class="link">Chat lain</button>
-      </nav>
+      <!-- what you can do with it: tucked away until you ask (the composer opens it) -->
+      <div id="sheet" class="sheet" hidden>
+        <button id="save-video" class="sheet__item"><span class="sheet__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 5v14M16 5v14M4 9h4M4 15h4M16 9h4M16 15h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="sheet__text"><b>Video</b><small>MP4 1080×1920, siap story &amp; reels</small></span></button>
+        <button id="save" class="sheet__item"><span class="sheet__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9.5h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="sheet__text"><b>Gambar slide ini</b><small>PNG</small></span></button>
+        <button id="save-all" class="sheet__item"><span class="sheet__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h13v13H7zM4 4h13M4 4v13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="sheet__text"><b>Semua gambar</b><small>.zip, satu PNG per slide</small></span></button>
+        <button id="again" class="sheet__item sheet__item--quiet"><span class="sheet__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-5-5 5-5M4 9h10a6 6 0 0 1 0 12h-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="sheet__text"><b>Chat lain</b><small>Balik ke awal</small></span></button>
+      </div>
     </section>
 
     <div class="flash" id="flash"></div>
-    <div class="drop">Lepas file chat-nya</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
