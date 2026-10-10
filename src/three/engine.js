@@ -18,6 +18,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { rng } from './shapes.js'
 
 // The 3D stage behind the story. One cloud of particles flies from shape to shape: at each slide
@@ -97,6 +98,35 @@ void main() {
 }
 `
 
+// the hit of a change of slide: a zoom blur with the colours pulled apart, and a soft vignette
+const KickShader = {
+  uniforms: { tDiffuse: { value: null }, uKick: { value: 0 }, uAspect: { value: 9 / 16 } },
+  vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float uKick;
+    uniform float uAspect;
+    varying vec2 vUv;
+    void main() {
+      vec2 c = vUv - 0.5;
+      vec3 col;
+      if (uKick < 0.002) col = texture2D(tDiffuse, vUv).rgb;
+      else {
+        col = vec3(0.0);
+        for (int i = 0; i < 10; i++) {
+          float s = 1.0 - uKick * 0.09 * float(i) / 9.0;
+          col.r += texture2D(tDiffuse, 0.5 + c * s * (1.0 + uKick * 0.018)).r;
+          col.g += texture2D(tDiffuse, 0.5 + c * s).g;
+          col.b += texture2D(tDiffuse, 0.5 + c * s * (1.0 - uKick * 0.018)).b;
+        }
+        col /= 10.0;
+      }
+      float v = smoothstep(1.0, 0.25, length(c * vec2(uAspect, 1.0)));
+      gl_FragColor = vec4(col * mix(0.7, 1.0, v), 1.0);
+    }
+  `,
+}
+
 const lin = (hex) => new Color(hex) // three converts sRGB hex to its linear working space
 
 export class Engine {
@@ -139,6 +169,8 @@ export class Engine {
     this.composer.addPass(new RenderPass(this.scene, this.camera))
     this.bloom = new UnrealBloomPass(new Vector2(256, 256), 0.55, 0.35, 0.3)
     this.composer.addPass(this.bloom)
+    this.kick = new ShaderPass(KickShader)
+    this.composer.addPass(this.kick)
     this.composer.addPass(new OutputPass())
 
     this.slides = []
@@ -169,6 +201,7 @@ export class Engine {
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
     this.bg.material.uniforms.uAspect.value = w / h
+    this.kick.uniforms.uAspect.value = w / h
     // particles keep the same size relative to the frame height
     this.uniforms.uSize.value = 60 * (h * pixelRatio) / 1920
   }
@@ -217,6 +250,15 @@ export class Engine {
     this.camera.position.x -= this.shiftX
     now.look.x -= this.shiftX
     this.camera.lookAt(now.look)
+    // the kick of a new slide: blur, split, a roll and a punch of the lens
+    const kick = i > 0 ? Math.sin(Math.PI * Math.min(1, t / 1.5)) ** 2 : 0
+    this.kick.uniforms.uKick.value = kick
+    this.camera.rotateZ(kick * 0.14 * (i % 2 ? 1 : -1))
+    const fov = 32 + kick * 14
+    if (this.camera.fov !== fov) {
+      this.camera.fov = fov
+      this.camera.updateProjectionMatrix()
+    }
     // the backdrop's colour drifts to the new slide's
     const b = this.bg.material.uniforms
     const pb = i > 0 ? this.slides[i - 1] : s

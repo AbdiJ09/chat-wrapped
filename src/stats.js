@@ -32,7 +32,7 @@ const median = (arr) => {
 
 export function computeStats({ messages, people }, { title = null } = {}) {
   const by = new Map(people.map((p) => [p, {
-    name: p, messages: 0, words: 0, media: 0, deleted: 0, starts: 0, laughs: 0,
+    name: p, messages: 0, words: 0, media: 0, deleted: 0, starts: 0, laughs: 0, night: 0,
     replies: [], words_: new Map(), emoji: new Map(), longest: null,
   }]))
   const hours = new Array(24).fill(0)
@@ -56,6 +56,7 @@ export function computeStats({ messages, people }, { title = null } = {}) {
     sequence[n++] = order.get(m.author)
     const d = new Date(m.t)
     hours[d.getHours()]++
+    if (d.getHours() < 4) p.night++
     weekdays[d.getDay()]++
     const k = dayKey(m.t)
     days.set(k, (days.get(k) ?? 0) + 1)
@@ -137,6 +138,7 @@ export function computeStats({ messages, people }, { title = null } = {}) {
       startShare: conversations ? p.starts / conversations : 0,
       replyMedian: median(p.replies),
       laughs: p.laughs,
+      night: p.night,
       longest: p.longest,
       topWords: [...p.words_.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12),
       topEmoji: [...p.emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),

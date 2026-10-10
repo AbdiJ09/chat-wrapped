@@ -5,17 +5,18 @@
 // ±1.5 wide and ±2.4 tall to fit a 9:16 frame), colours (linear RGB), and how fast each one turns
 // around the vertical axis (radians/s) once it has arrived.
 
-export const PALETTE = [
-  [0.95, 0.68, 0.32], // gold
-  [0.48, 0.64, 1.0], // cool blue
-  [0.92, 0.5, 0.55],
-  [0.45, 0.85, 0.66],
-  [0.86, 0.8, 0.45],
-  [0.7, 0.58, 0.95],
-  [0.9, 0.6, 0.82],
-  [0.5, 0.82, 0.9],
-]
-export const CREAM = [1.0, 0.93, 0.82]
+import { linear } from '../theme.js'
+
+// the people's colours and the theme's light: set from the theme before a story is built
+export const PALETTE = []
+export const CREAM = [1, 1, 1]
+export function usePalette(theme) {
+  PALETTE.length = 0
+  for (const hex of theme.people) PALETTE.push(linear(hex))
+  // duos have two colours; give everyone else in a group a colour too
+  while (PALETTE.length < 8) PALETTE.push(PALETTE[PALETTE.length % 2])
+  CREAM.splice(0, 3, ...linear(theme.ink))
+}
 
 export function rng(seed = 1) {
   let s = seed >>> 0
@@ -139,7 +140,7 @@ function sample(draw, w, h, step = 2) {
 }
 
 /** Text made of particles, scaled so the ink spans `width` world units. */
-export function words(N, A, str, { width = 2.9, font = '300 220px Fraunces', seed = 4, spin = 0, colors = null } = {}) {
+export function words(N, A, str, { width = 2.9, font = '800 220px "Bricolage Grotesque"', seed = 4, spin = 0, colors = null } = {}) {
   const r = rng(seed)
   const s = make(N)
   const W = 1600
@@ -348,6 +349,58 @@ export function galaxy(N, A, seed = 11) {
     const x = core ? gauss(r) * 0.22 : Math.cos(a) * rad
     const z = core ? gauss(r) * 0.22 : Math.sin(a) * rad
     put(s, k, x, gauss(r) * (core ? 0.12 : 0.04), z, core ? CREAM : PALETTE[A[k]], 0.2, core ? 0.9 : 0.75)
+  }
+  return s
+}
+
+// — couples: a heart, the left half one of you, the right half the other —
+export function heart(N, A, seed = 12) {
+  const r = rng(seed)
+  const s = make(N)
+  const inside = (x, y) => (x * x + y * y - 1) ** 3 - x * x * y ** 3 < 0
+  for (let k = 0; k < N; k++) {
+    const side = A[k] === 0 ? -1 : 1
+    let x
+    let y
+    do {
+      x = r() * 1.25 * side
+      y = r() * 2.5 - 1.2
+    } while (!inside(x, y))
+    // rounder in the middle, so it has a body when it turns
+    const depth = Math.sqrt(Math.max(0, 1 - (x * x + (y - 0.2) ** 2) / 1.6)) * 0.45
+    const shell = r() < 0.6
+    const z = (shell ? depth : depth * (r() * 2 - 1)) * (r() < 0.5 ? 1 : -1)
+    put(s, k, x * 1.05, y * 1.05 + 0.05, z, PALETTE[A[k] === 0 ? 0 : 1], 0.12, shell ? 1 : 0.6)
+  }
+  return s
+}
+
+// — groups: a podium for the top three —
+export function podium(N, A, top, seed = 13) {
+  const r = rng(seed)
+  const s = make(N)
+  const steps = [
+    { x: 0, h: 1.35 },
+    { x: -0.82, h: 0.95 },
+    { x: 0.82, h: 0.7 },
+  ]
+  for (let k = 0; k < N; k++) {
+    const q = r()
+    if (q < 0.9) {
+      const i = Math.min(2, Math.floor(r() * 3))
+      const st = steps[i]
+      const x = st.x + (r() - 0.5) * 0.66
+      const y = -1.1 + r() * st.h
+      const z = (r() - 0.5) * 0.5
+      // brighter along the edges of each block
+      const edge = Math.abs(x - st.x) > 0.3 || Math.abs(z) > 0.22 || y > -1.1 + st.h - 0.04
+      put(s, k, x, y, z, PALETTE[top[i] ?? i], 0.18, edge ? 1 : 0.35)
+    } else {
+      // a crown of sparks above the winner
+      const a = r() * Math.PI * 2
+      const d = 0.12 + r() * 0.06
+      put(s, k, Math.cos(a) * d, 0.45 + Math.abs(Math.sin(a * 2.5)) * 0.14 + r() * 0.03, Math.sin(a) * d, CREAM, 0.8, 1)
+    }
   }
   return s
 }

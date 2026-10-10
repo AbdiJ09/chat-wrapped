@@ -4,8 +4,9 @@ export const W = 1080
 export const H = 1920
 export const M = 96 // side margin
 
-export const SERIF = '"Fraunces", Georgia, serif'
-export const SANS = '"Inter", system-ui, sans-serif'
+export const DISPLAY = '"Bricolage Grotesque", system-ui, sans-serif'
+export const SANS = '"Geist", system-ui, sans-serif'
+export const MONO = '"Geist Mono", ui-monospace, monospace'
 
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 export const easeOut = (t) => 1 - (1 - t) ** 3
@@ -68,7 +69,7 @@ export function wrap(ctx, str, maxWidth, o) {
 
 /** An all-caps little label above a slide's headline. */
 export function eyebrow(ctx, str, y, color, alpha) {
-  text(ctx, str.toUpperCase(), M, y, { size: 30, weight: 500, spacing: 5, color, alpha, rise: 12 })
+  text(ctx, str.toUpperCase(), M, y, { size: 28, weight: 500, family: MONO, spacing: 3, color, alpha, rise: 12 })
 }
 
 export function measure(ctx, str, o) {
@@ -98,16 +99,4 @@ export function drawGrain(ctx, alpha = 0.06) {
   ctx.fillStyle = grain
   ctx.fillRect(0, 0, W, H)
   ctx.restore()
-}
-
-export function background(ctx, color, glow) {
-  ctx.fillStyle = color
-  ctx.fillRect(0, 0, W, H)
-  if (glow) {
-    const g = ctx.createRadialGradient(W * 0.5, H * 0.42, 0, W * 0.5, H * 0.42, H * 0.7)
-    g.addColorStop(0, glow)
-    g.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, W, H)
-  }
 }

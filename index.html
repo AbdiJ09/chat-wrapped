@@ -4,61 +4,65 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Chat Wrapped</title>
-    <meta name="description" content="Ubah chat WhatsApp jadi cerita: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
-    <meta name="theme-color" content="#0f0e0d" />
+    <meta name="description" content="Ubah chat WhatsApp jadi film 3D: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
+    <meta name="theme-color" content="#05080f" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..400&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="landing-3d" class="landing-3d" aria-hidden="true"></div>
+    <canvas id="tunnel" class="tunnel" aria-hidden="true"></canvas>
+
     <main id="landing" class="landing">
       <header class="bar">
-        <span>Chat Wrapped</span>
-        <span>Dibuat oleh Abi</span>
+        <span class="logo">chat<b>wrapped</b></span>
+        <span class="bar__note">100% di browsermu</span>
       </header>
 
       <section class="hero">
-        <div class="hero__copy">
-          <h1>Setahun ngobrol,<br /><em>jadi satu cerita.</em></h1>
-          <p class="lede">
-            Masukin export chat WhatsApp-mu. Keluar ceritanya: siapa yang nyapa duluan, siapa yang paling cepet bales, jam paling rame, kata-kata khas kalian. Siap dibagikan ke story.
-          </p>
-          <div class="actions">
-            <button id="pick" class="button">Pilih file chat</button>
-            <button id="demo" class="link">Lihat contoh</button>
-          </div>
-          <p id="note" class="note">Diproses sepenuhnya di browsermu. Chatnya nggak pernah di-upload ke mana pun.</p>
-          <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
-
-          <details class="howto">
-            <summary>Cara export chat</summary>
-            <div class="howto__cols">
-              <div>
-                <h3>Android</h3>
-                <ol>
-                  <li>Buka chat-nya</li>
-                  <li>⋮ → Lainnya → Ekspor chat</li>
-                  <li>Pilih <b>Tanpa media</b></li>
-                  <li>Simpan ke File, lalu pilih di sini</li>
-                </ol>
-              </div>
-              <div>
-                <h3>iPhone</h3>
-                <ol>
-                  <li>Buka chat-nya, ketuk namanya</li>
-                  <li>Ekspor Chat</li>
-                  <li>Pilih <b>Tanpa Media</b></li>
-                  <li>Simpan ke File, lalu pilih di sini</li>
-                </ol>
-              </div>
-            </div>
-          </details>
+        <p class="tag"><span class="dot"></span> WhatsApp → film 3D</p>
+        <h1 class="hero__title"><span>Chat kalian,</span><span class="hero__accent">jadi film.</span></h1>
+        <p class="lede">Masukin export chat WhatsApp. Keluar film 3D tentang kalian: siapa yang nyapa duluan, siapa paling cepet bales, jam paling rame, kata-kata khas. Simpan jadi video buat story.</p>
+        <div class="actions">
+          <button id="pick" class="button">Pilih file chat</button>
+          <button id="demo" class="button button--ghost">Lihat contoh</button>
         </div>
-
+        <p id="note" class="note">Chatnya diproses di HP/laptopmu. Nggak pernah di-upload.</p>
+        <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
+        <a class="scroll" href="#vibes">pilih vibe ↓</a>
       </section>
+
+      <section id="vibes" class="vibes">
+        <h2>Tiap chat punya <em>vibe</em>-nya.</h2>
+        <p class="sub">Arahin ke salah satu, lihat terowongannya ganti warna. Temanya ditebak otomatis dari chat-mu, tapi bisa kamu ganti.</p>
+        <div id="vibe-list" class="vibe-list"></div>
+      </section>
+
+      <section class="how">
+        <h2>Tiga langkah.</h2>
+        <ol class="steps">
+          <li><b>01</b><h3>Export chat</h3><p><span class="os">Android</span> ⋮ → Lainnya → Ekspor chat → Tanpa media.<br /><span class="os">iPhone</span> Ketuk nama → Ekspor Chat → Tanpa Media.</p></li>
+          <li><b>02</b><h3>Masukin ke sini</h3><p>Pilih file .txt atau .zip-nya, atau seret ke halaman ini. Semua dihitung di browser.</p></li>
+          <li><b>03</b><h3>Simpan videonya</h3><p>Video 1080×1920 siap story & reels, atau gambar per slide.</p></li>
+        </ol>
+      </section>
+
+      <footer class="foot">
+        <span>chat<b>wrapped</b> — dibuat oleh Abi</span>
+        <span>Chatmu nggak pernah keluar dari perangkatmu.</span>
+      </footer>
     </main>
+
+    <section id="picker" class="picker" hidden>
+      <p class="tag"><span class="dot"></span> <span id="picker-count"></span></p>
+      <h2 class="picker__title">Ini chat apa?</h2>
+      <div id="picker-list" class="vibe-list vibe-list--pick"></div>
+      <div class="actions">
+        <button id="go" class="button">Putar filmnya</button>
+        <button id="cancel" class="button button--ghost">Ganti file</button>
+      </div>
+    </section>
 
     <section id="story" class="story" hidden>
       <div id="story-frame" class="story__frame">
@@ -73,7 +77,8 @@
       </nav>
     </section>
 
-    <div class="drop">Lepas file chat di sini</div>
+    <div class="flash" id="flash"></div>
+    <div class="drop">Lepas file chat-nya</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
