@@ -404,7 +404,7 @@ export function emoji(N, A, char, seed = 10) {
   }, SIZE, SIZE), seed)
 }
 
-// — premium: the favourite sticker, the same way (img: a square canvas, see media.js) —
+// — the favourite sticker, the same way (img: a square canvas, see media.js) —
 // (a little smaller than the emoji, and its whites kept from glowing: stickers are mostly white)
 export function sticker(N, A, img, seed = 20) {
   return mosaic(N, A, inked((g, w, h) => g.drawImage(img, 0, 0, w, h), 400, 400), seed, { width: 2.0, height: 2.0, light: 0.42 })

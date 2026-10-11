@@ -512,8 +512,8 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     })
   }
 
-  // — premium, from an export with media: the favourite sticker, and the voice notes —
-  const MD = premium && S.media
+  // — from an export with media (for everyone): the favourite sticker, and the voice notes —
+  const MD = S.media
   const st = MD?.stickers.top
   if (st?.img && st.n >= 3) {
     const rows = P.map((p, i) => ({ p, i, m: MD.people[i] }))
