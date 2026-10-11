@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <!-- dark from the very first frame, before any stylesheet -->
+    <style>html { background: #05080f; }</style>
+    <script>
+      // arriving from Abi's Room (its phone's screen dives into this page): open on the same dark
+      // and fade in from it, with the address left clean
+      if (new URLSearchParams(location.search).get('from') === 'room') {
+        document.documentElement.classList.add('from-room')
+        history.replaceState(null, '', location.pathname + location.hash)
+      }
+    </script>
     <title>Chat Wrapped</title>
     <meta name="description" content="Rekap chat WhatsApp kalian: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
     <meta name="theme-color" content="#05080f" />

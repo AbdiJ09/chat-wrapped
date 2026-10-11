@@ -420,6 +420,9 @@ body.is-story .composer { width: min(460px, calc(100vw - 24px)); }
 /* the edges darken while it's read */
 body::before { content: ''; position: fixed; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(circle at 50% 46%, transparent 18%, rgba(0, 0, 0, 0.78) 72%); opacity: 0; transition: opacity 1s; }
 body.is-reading::before { opacity: 1; }
+/* arriving from Abi's Room: the phone's dark screen becomes this page (see index.html) */
+.from-room body::after { content: ''; position: fixed; inset: 0; z-index: 999; pointer-events: none; background: #05080f; animation: from-room 1.2s 0.35s cubic-bezier(0.3, 0, 0.2, 1) forwards; }
+@keyframes from-room { to { opacity: 0; visibility: hidden; } }
 /* the composer goes off: shrinks to its point of light and floats up into the middle */
 .composer.is-sending { animation: send-off 0.85s cubic-bezier(0.6, 0, 0.3, 1) both; pointer-events: none; }
 .composer.is-sending .composer__clip, .composer.is-sending .composer__field { opacity: 0; transition: opacity 0.2s; }
