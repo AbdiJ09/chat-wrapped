@@ -1,5 +1,6 @@
 import { W, H, M, DISPLAY, MONO, at, clamp, easeInOut, num, date, duration, text, wrap, eyebrow, measure, drawGrain } from './draw.js'
 import * as shapes from '../three/shapes.js'
+import { KINDS, CAMS, sceneShape, sceneMessage } from './scenes.js'
 
 // The story: each slide is a sculpture for the bubbles (with a camera and a backdrop) plus a
 // layer of words on top. The middle of the frame belongs to the 3D; words live above and below.
@@ -454,6 +455,55 @@ export function makeStory(S, N, theme, premium = null) {
           ctx.fillText(p.topEmoji.slice(0, 3).map(([e]) => e).join(' '), W - M, y + 14)
           ctx.restore()
         })
+      },
+    })
+  }
+
+  // — premium: the scenes you made yourself (our layouts, your chat) —
+  for (const sc of premium?.scenes ?? []) {
+    const m = sceneMessage(sc)
+    const ai = Math.max(0, P.findIndex((p) => p.name === m?.author))
+    const title = sc.title?.trim() || (sc.kind === 'count' ? `“${sc.phrase}”` : KINDS[sc.kind].title)
+    // a message, big, in lines (cut short if it's long)
+    const quote = (ctx, msg, y0, { max = 110, cap = 110, rows = 4, delay = 0.5 } = {}, t = 0) => {
+      const q = msg.text.length > max ? `${msg.text.slice(0, max - 3)}…` : msg.text
+      const size = Math.min(cap, q.length < 24 ? 110 : q.length < 60 ? 80 : 58)
+      const lines = wrap(ctx, `“${q}”`, W - 2 * M, head(size)).slice(0, rows)
+      lines.forEach((l, i) => text(ctx, l, M, y0 + i * size * 1.05, head(size, { color: FG, alpha: at(t, late + delay + i * 0.15, 1.2), rise: 50 })))
+      return y0 + lines.length * size * 1.05
+    }
+    add({
+      id: sc.id,
+      label: title,
+      duration: 7,
+      shape: sceneShape(sc, S, N, A),
+      cam: CAMS[sc.object],
+      words(ctx, t) {
+        shade(ctx)
+        eyebrow(ctx, title, 250, MUTED, at(t, late))
+        if (sc.kind === 'quote') {
+          text(ctx, date(new Date(m.t), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }), M, 310, { size: 32, color: MUTED, alpha: at(t, late + 0.2) })
+          const end = quote(ctx, m, 1300, { max: 140 }, t)
+          text(ctx, `— ${m.author}`, M, end + 24, { size: 38, weight: 500, color: colorOf(ai), alpha: at(t, late + 1.3) })
+        } else if (sc.kind === 'count') {
+          const k = easeInOut(clamp((t - late) / 1.6))
+          text(ctx, `${num(sc.total * k)}×`, M, 450, big(190, { color: theme.accent, alpha: at(t, late + 0.2), rise: 0 }))
+          text(ctx, `Pertama kali: ${date(new Date(m.t))}, ${first(m.author)}.`, M, 530, { size: 34, color: MUTED, alpha: at(t, late + 0.5) })
+          const people = (S.group ? top6 : P.slice(0, 2)).map((p) => [p, sc.by[p.name] ?? 0]).sort((a, b) => b[1] - a[1]).slice(0, 4)
+          people.forEach(([p, n], i) => {
+            const y = 1460 + i * 92
+            const a = at(t, late + 0.8 + i * 0.15)
+            text(ctx, first(p.name), M, y, { size: 40, weight: 500, color: colorOf(P.indexOf(p)), alpha: a })
+            text(ctx, `${num(n * k)}×`, W - M, y, head(56, { color: FG, align: 'right', alpha: a }))
+          })
+        } else {
+          text(ctx, date(new Date(sc.t), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), M, 420, head(70, { color: FG, alpha: at(t, late + 0.2), rise: 40 }))
+          text(ctx, `${num(sc.n)} pesan hari itu.`, M, 500, { size: 34, color: MUTED, alpha: at(t, late + 0.4) })
+          if (m) {
+            text(ctx, `DIMULAI ${first(m.author).toUpperCase()}, JAM ${date(new Date(m.t), { hour: '2-digit', minute: '2-digit' })}`, M, 1400, { size: 24, family: MONO, weight: 500, spacing: 3, color: colorOf(ai), alpha: at(t, late + 0.8) })
+            quote(ctx, m, 1490, { max: 90, cap: 72, rows: 3, delay: 1 }, t)
+          }
+        }
       },
     })
   }

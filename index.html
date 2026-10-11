@@ -193,6 +193,34 @@
           <div id="custom-people" class="custom__people"></div>
         </div>
         <div class="custom__field">
+          <span class="custom__label">Scene kamu <small id="maker-left"></small></span>
+          <div id="maker-list" class="maker__list"></div>
+          <button id="maker-open" class="gift__custom maker__open" type="button"><span>+ Bikin scene</span><small>dari chat kalian sendiri</small><i aria-hidden="true">→</i></button>
+          <div id="maker" class="maker" hidden>
+            <div id="maker-kind" class="maker__kinds" role="radiogroup" aria-label="Jenis scene"></div>
+            <div class="maker__body">
+              <div data-kind="quote">
+                <input id="maker-q" placeholder="Cari pesan, mis. sayang, maaf, jadian…" autocomplete="off" />
+                <div id="maker-results" class="maker__results"></div>
+              </div>
+              <div data-kind="count" hidden>
+                <input id="maker-word" maxlength="30" placeholder="Kata atau kalimat, mis. mie ayam" autocomplete="off" />
+              </div>
+              <div data-kind="day" hidden>
+                <input id="maker-day" type="date" />
+              </div>
+              <p id="maker-found" class="maker__found"></p>
+            </div>
+            <span class="custom__label">Bentuk</span>
+            <div id="maker-objects" class="custom__scenes maker__objects"></div>
+            <input id="maker-title" maxlength="40" placeholder="Judul (opsional)" autocomplete="off" />
+            <div class="maker__actions">
+              <button id="maker-cancel" type="button" class="maker__cancel">Batal</button>
+              <button id="maker-add" type="button" class="custom__done" disabled>Tambah scene</button>
+            </div>
+          </div>
+        </div>
+        <div class="custom__field">
           <span class="custom__label">Scene <small>ketuk buat matiin</small></span>
           <div id="custom-scenes" class="custom__scenes"></div>
         </div>

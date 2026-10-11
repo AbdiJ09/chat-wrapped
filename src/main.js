@@ -2,7 +2,8 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
-import { rename, recolor } from './custom.js'
+import { rename, recolor, renameScenes } from './custom.js'
+import { MAX_SCENES, KINDS, OBJECTS, objectsFor, searchMessages, quoteScene, countScene, dayScene } from './story/scenes.js'
 import { makeStory, posterWords } from './story/slides.js'
 import { Player } from './player.js'
 import { readSong, suggestStart, snap } from './music/beat.js'
@@ -328,7 +329,7 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 let lengthOf = null
 function filmLength() {
   const { stats, theme, premium } = film()
-  const key = premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}` : ''
+  const key = premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : ''
   if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium).reduce((a, s) => a + s.duration, 0) }
   return lengthOf.s
 }
@@ -471,14 +472,14 @@ function songFrame() {
 // — premium ("make it a gift"): no payment yet, it simply turns on —
 // Your photo (the bubbles build it, right here in the picker, and at the end of the film), your
 // own words to end on, the chapters of your moments, no watermark, and a poster.
-let gift = null // { photo: a 4:5 canvas or null, message, title, names: { chat name → nickname }, colors: [hex], hidden: Set of slide ids }
-const newGift = () => ({ photo: null, message: $('gift-message').value, title: '', names: {}, colors: [], hidden: new Set() })
+let gift = null // { photo: a 4:5 canvas or null, message, title, names: { chat name → nickname }, colors: [hex], hidden: Set of slide ids, scenes: your own (story/scenes.js) }
+const newGift = () => ({ photo: null, message: $('gift-message').value, title: '', names: {}, colors: [], hidden: new Set(), scenes: [] })
 // what the film is made of, with the gift's changes: the stats (renamed), the theme (recoloured),
 // and the premium part for makeStory
 function film() {
   const theme = recolor(chat.theme, gift?.colors)
   const stats = gift ? rename(chat.stats, gift.names) : chat.stats
-  const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden }
+  const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names) }
   return { stats, theme, premium }
 }
 const giftPhoto = $('gift-photo')
@@ -553,6 +554,7 @@ function showWho() {
 }
 function openCustom(on) {
   if (!gift) return
+  if (!on && draft) openMaker(false)
   custom.hidden = !on
   picker.classList.toggle('is-custom', on)
   composer.classList.toggle('is-away', on)
@@ -570,6 +572,7 @@ function openCustom(on) {
     })
     .join('')
   $('custom-reset').hidden = !gift.colors.some(Boolean)
+  makerList()
   // every scene the film would have (the cover always stays)
   const { stats, theme: t, premium } = film()
   const slides = makeStory(stats, 300, t, { ...premium, hidden: new Set() })
@@ -602,6 +605,126 @@ $('custom-reset').addEventListener('click', () => {
   setTheme(chat.theme)
   openCustom(true)
 })
+// — making a scene of your own: what it's about (a message, a word, a day), which of our forms,
+// a title if you like; the studio shows it as you go —
+let draft = null // { kind, data (the scene's numbers, or null while there's nothing yet), object, title }
+const esc = (str) => str.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const fmtDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+function sceneName(sc) {
+  if (sc.title?.trim()) return sc.title.trim()
+  if (sc.kind === 'quote') return `“${sc.m.text.slice(0, 40)}${sc.m.text.length > 40 ? '…' : ''}”`
+  if (sc.kind === 'count') return `“${sc.phrase}” ${sc.total}×`
+  return fmtDate.format(sc.t)
+}
+function makerList() {
+  $('maker-list').innerHTML = gift.scenes
+    .map((sc) => `<div class="maker__item"><small>${KINDS[sc.kind].label}</small><b>${esc(sceneName(sc))}</b><button class="song__x" type="button" data-id="${sc.id}" aria-label="Hapus scene">×</button></div>`)
+    .join('')
+  $('maker-left').textContent = gift.scenes.length ? `${gift.scenes.length} dari ${MAX_SCENES}` : `maks ${MAX_SCENES}, masuk sebelum penutup`
+  $('maker-open').hidden = gift.scenes.length >= MAX_SCENES || !!draft
+}
+function back3D() {
+  if (view === 'picker') gift?.photo ? stage.show('portrait', { force: true }) : stage.show('cover', { force: true })
+}
+function openMaker(on) {
+  draft = on ? { kind: 'quote', data: null, object: null, title: '' } : null
+  $('maker').hidden = !on
+  if (on) {
+    $('maker-q').value = ''
+    $('maker-word').value = ''
+    $('maker-day').value = ''
+    $('maker-title').value = ''
+    $('maker-results').innerHTML = ''
+    const S = chat.stats
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    $('maker-day').min = iso(S.start)
+    $('maker-day').max = iso(S.end)
+    makerDraw()
+    $('maker-q').focus()
+  } else back3D()
+  makerList()
+}
+// the kinds, the forms, what was found, and the 3D
+function makerDraw() {
+  $('maker-kind').innerHTML = Object.entries(KINDS)
+    .map(([k, v]) => `<button type="button" role="radio" data-kind="${k}" aria-checked="${draft.kind === k}">${v.label}</button>`)
+    .join('')
+  for (const el of $('maker').querySelectorAll('.maker__body [data-kind]')) el.hidden = el.dataset.kind !== draft.kind
+  const d = draft.data
+  const objects = d ? objectsFor(d) : KINDS[draft.kind].objects
+  if (d && !objects.includes(draft.object)) draft.object = objects[0]
+  $('maker-objects').innerHTML = objects
+    .map((o) => `<button type="button" class="custom__scene" data-object="${o}" aria-pressed="${draft.object === o}" ${d ? '' : 'disabled'}>${OBJECTS[o]}</button>`)
+    .join('')
+  $('maker-title').placeholder = `Judul (opsional) · ${d?.kind === 'count' ? `“${d.phrase}”` : KINDS[draft.kind].title}`
+  $('maker-add').disabled = !d
+  const found = $('maker-found')
+  if (draft.kind === 'count') {
+    const P = chat.stats.people.slice(0, 3)
+    found.innerHTML = d ? `<b>${d.total}×</b> · ${P.map((p) => `${esc(p.name)} ${d.by[p.name] ?? 0}`).join(' · ')}` : $('maker-word').value.trim().length > 1 ? 'Nggak ketemu di chat kalian.' : ''
+  } else if (draft.kind === 'day') {
+    found.innerHTML = d ? `<b>${d.n} pesan</b> hari itu` : $('maker-day').value ? 'Hari itu kalian nggak ngobrol.' : ''
+  } else found.innerHTML = d ? '' : ''
+  if (d) stage.preview({ ...d, object: draft.object })
+}
+function makerSet(data) {
+  draft.data = data
+  makerDraw()
+}
+$('maker-open').addEventListener('click', () => openMaker(true))
+$('maker-cancel').addEventListener('click', () => openMaker(false))
+$('maker-kind').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind]')
+  if (!b || b.dataset.kind === draft.kind) return
+  draft = { ...draft, kind: b.dataset.kind, data: null, object: null }
+  makerDraw()
+  back3D()
+})
+$('maker-q').addEventListener('input', (e) => {
+  const q = e.target.value
+  const hits = searchMessages(chat.messages, q)
+  const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+  $('maker-results').innerHTML = hits.length
+    ? hits.map((m, i) => `<button type="button" data-i="${i}"><small>${fmtDate.format(m.t)} · ${esc(m.author)}</small><span>${esc(m.text).replace(re, (x) => `<mark>${x}</mark>`)}</span></button>`).join('')
+    : q.trim().length > 1 ? '<p class="maker__found">Nggak ketemu.</p>' : ''
+  $('maker-results').hits = hits
+  if (draft.data) makerSet(null)
+})
+$('maker-results').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-i]')
+  if (!b) return
+  for (const x of $('maker-results').querySelectorAll('button')) x.setAttribute('aria-pressed', x === b)
+  makerSet(quoteScene($('maker-results').hits[+b.dataset.i]))
+})
+let wordTimer = null
+$('maker-word').addEventListener('input', (e) => {
+  clearTimeout(wordTimer)
+  wordTimer = setTimeout(() => makerSet(countScene(chat.messages, e.target.value)), 220)
+})
+$('maker-day').addEventListener('change', (e) => makerSet(e.target.value ? dayScene(chat.messages, e.target.value) : null))
+$('maker-objects').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-object]')
+  if (!b || b.disabled) return
+  draft.object = b.dataset.object
+  makerDraw()
+})
+$('maker-title').addEventListener('input', (e) => (draft.title = e.target.value))
+$('maker-add').addEventListener('click', () => {
+  if (!draft?.data || gift.scenes.length >= MAX_SCENES) return
+  gift.scenes.push({ ...draft.data, object: draft.object, title: draft.title.trim(), id: `mine-${Date.now()}` })
+  openMaker(false)
+  openCustom(true)
+  if (song) drawWave()
+})
+$('maker-list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-id]')
+  if (!b) return
+  gift.scenes = gift.scenes.filter((sc) => sc.id !== b.dataset.id)
+  gift.hidden.delete(b.dataset.id)
+  openCustom(true)
+  if (song) drawWave()
+})
+
 $('custom-scenes').addEventListener('click', (e) => {
   const b = e.target.closest('.custom__scene')
   if (!b || b.disabled) return
@@ -639,7 +762,7 @@ function analyse(text, title) {
   if (parsed.messages.length < 30) throw new Error('Chat-nya terlalu pendek untuk diceritain. Coba chat yang lebih panjang.')
   const stats = computeStats(parsed, { title: parsed.people.length > 2 ? title : null })
   stats.moments = computeMoments(parsed.messages, parsed.people)
-  return { stats, guess: detectTheme(stats, text) }
+  return { stats, guess: detectTheme(stats, text), messages: parsed.messages }
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -683,11 +806,12 @@ function tween(a, b, ms, fn, curve = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x 
  *   title    your names, letter by letter, like a film's title card
  *   land     the title flies up into the picker's corner; the picker builds in round it
  */
-async function showPicker({ stats, guess }) {
+async function showPicker({ stats, guess, messages }) {
   view = 'picker'
   const move = ++moves
   const theme = THEMES[guess]
-  chat = { stats, theme }
+  // (the messages themselves are kept only for making your own scenes)
+  chat = { stats, theme, messages }
   const e = stage.engine
   const gone = () => move !== moves
   // send

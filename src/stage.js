@@ -1,5 +1,6 @@
 import { Engine, MORPH } from './three/engine.js'
 import * as shapes from './three/shapes.js'
+import { CAMS, sceneShape } from './story/scenes.js'
 
 // The landing's 3D: the same studio and bubbles as the film, playing a chat (the demo, or yours
 // once you've picked it). Each scene of the page has a sculpture, and on the landing the scroll
@@ -30,11 +31,12 @@ const SCENES = {
 // which sculpture a scene is in a theme (a couple's cover is a heart, everyone else's a helix)
 const form = (name, theme) => (name === 'cover' ? (theme.id === 'couple' ? 'heart' : 'helix') : name)
 
-function build(name, S, N, theme) {
+function build(name, S, N, theme, scene) {
   shapes.usePalette(theme)
   const A = shapes.authors(S, N)
   const P = S.people
   switch (name) {
+    case 'custom': return sceneShape(scene, S, N, A)
     case 'badge': return shapes.badge(N, A)
     case 'orbs': return shapes.orbs(N, A, S.group ? P.slice(0, 6).map((p) => p.share) : [P[0].share, P[1].share])
     case 'pillars': return shapes.pillars(N, A, S.hours, S.peakHour)
@@ -93,10 +95,11 @@ export class Stage {
 
   #slide(name) {
     // (a theme with your own colours is the same theme, but not the same look)
-    const key = `${name}:${this.theme.id}:${this.theme.people.join()}`
+    const key = `${name}:${this.theme.id}:${this.theme.people.join()}${name === 'custom' ? JSON.stringify(this.scene) : ''}`
     if (!this.cache.has(key)) {
       const { theme } = this
-      this.cache.set(key, { shape: build(name, this.stats, this.N, theme), cam: { dolly: 0, ...SCENES[name].cam }, bg: theme.bg, glow: theme.glow, rim: theme.people[1], duration: 0 })
+      const cam = name === 'custom' ? CAMS[this.scene.object] : SCENES[name].cam
+      this.cache.set(key, { shape: build(name, this.stats, this.N, theme, this.scene), cam: { dolly: 0, ...cam }, bg: theme.bg, glow: theme.glow, rim: theme.people[1], duration: 0 })
     }
     return this.cache.get(key)
   }
@@ -143,6 +146,12 @@ export class Stage {
     // the same sculpture, only the colours change: a wave; otherwise a flight
     if (settled && form(this.name, was) === form(this.name, theme)) this.engine.flipTo(this.mode === 'scroll' ? this.#reel() : this.#slide(this.name))
     else this.#timed(this.name, null, this.mode === 'scroll' || this.then)
+  }
+
+  /** premium: fly into a scene you're making (see story/scenes.js). */
+  preview(scene) {
+    this.scene = scene
+    this.show('custom', { force: true })
   }
 
   /** premium: your photo for the 'portrait' sculpture (a 4:5 canvas). */

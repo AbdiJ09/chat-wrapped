@@ -24,3 +24,15 @@ export function recolor(theme, colors) {
   if (!colors?.some(Boolean)) return theme
   return { ...theme, people: theme.people.map((c, i) => colors[i] || c) }
 }
+
+/** Your own scenes, with everyone renamed the same way. */
+export function renameScenes(scenes, names) {
+  const n = (x) => names[x]?.trim() || x
+  const said = (m) => m && { ...m, author: n(m.author) }
+  return scenes.map((sc) => ({
+    ...sc,
+    m: said(sc.m),
+    first: said(sc.first),
+    by: sc.by && Object.fromEntries(Object.entries(sc.by).map(([k, v]) => [n(k), v])),
+  }))
+}

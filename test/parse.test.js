@@ -131,3 +131,26 @@ test('premium names: nicknames reach every name in the story', async () => {
   assert.equal(recolor(t, []), t)
   assert.deepEqual(recolor(t, [undefined, '#abcdef']).people, ['#111111', '#abcdef'])
 })
+
+test('premium: your own scenes from the chat (a word counted, a day, a search)', async () => {
+  const { countScene, dayScene, searchMessages, objectsFor } = await import('../src/story/scenes.js')
+  const { messages } = parseWhatsApp([
+    '13/02/25 23.50 - Hari: mau mie ayam',
+    '14/02/25 00.10 - Uraaatu: Mie Ayam lagi?? mie ayamnya enak',
+    '14/02/25 08.00 - Hari: selamat valentine',
+    '15/02/25 09.00 - Uraaatu: mieayam',
+  ].join('\n'))
+  const c = countScene(messages, ' mie   ayam ')
+  assert.equal(c.phrase, 'mie ayam')
+  assert.equal(c.total, 2, 'whole words, any case; not "mie ayamnya" or "mieayam"')
+  assert.deepEqual(c.by, { Hari: 1, Uraaatu: 1 })
+  assert.equal(c.first.author, 'Hari')
+  assert.equal(countScene(messages, 'pizza'), null)
+  const d = dayScene(messages, '2025-02-14')
+  assert.equal(d.n, 2)
+  assert.equal(d.first.text, 'Mie Ayam lagi?? mie ayamnya enak')
+  assert.equal(dayScene(messages, '2025-03-01'), null)
+  assert.equal(searchMessages(messages, 'VALENTINE').length, 1)
+  assert.equal(searchMessages(messages, 'v').length, 0, 'at least two letters')
+  assert.ok(!objectsFor({ kind: 'count', phrase: 'kalimat yang panjang sekali' }).includes('text'))
+})
