@@ -67,13 +67,35 @@ function shade(ctx, top = true) {
   }
 }
 
+/**
+ * What the words slide shows (null if there's nothing): the word you say most, and per person
+ * (up to 3) what they call the other one and their own words — the ones only they say, or else
+ * what they say most. off: words you've hidden (premium, lowercase), so the next ones move up.
+ */
+export function wordsOf(S, off = null) {
+  const ok = (w) => !off?.has(w.toLowerCase())
+  const top = S.topWords.find(([w]) => ok(w))
+  if (!top) return null
+  const [word, count] = top
+  const cols = S.people.slice(0, S.group ? 3 : 2).map((p) => {
+    const sigs = p.signatures.filter((x) => ok(x.word)).map((x) => [x.word, x.n])
+    return {
+      p,
+      call: S.group ? null : (p.callList ?? []).find(([w]) => ok(w)) ?? null,
+      khas: sigs.length > 0,
+      own: (sigs.length ? sigs : p.topWords.filter(([w]) => w !== word && ok(w))).slice(0, 3),
+    }
+  })
+  return { word, count, cols }
+}
+
 /** Words appear a beat after the bubbles start landing. */
 const late = 1.1
 
 /**
  * premium (or null): { moments (computeMoments), photo (a 4:5 canvas, or null), message (your
  * words for the end, or ''), title (for the cover, or ''), hidden (a Set of slide ids to leave
- * out) } — adds the chapters, the ending, and takes the watermark off. Every slide has an id and
+ * out), words (a Set of words to leave off the words slide, lowercase) } — adds the chapters, the ending, and takes the watermark off. Every slide has an id and
  * a label (for choosing which to keep). only: build just the slide with this id (a preview);
  * sculpt: false to skip building the sculptures (when only the slides' lengths and names matter).
  */
@@ -404,12 +426,13 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
   }
 
   // — 9. words —
-  const all = new Map()
-  for (const p of P) for (const [w, c] of p.topWords) all.set(w, (all.get(w) ?? 0) + c)
-  const top = [...all.entries()].sort((a, b) => b[1] - a[1])
-  if (top.length) {
-    const [word, count] = top[0]
-    const cols = P.slice(0, S.group ? 3 : 2)
+  const WD = wordsOf(S, premium?.words)
+  if (WD) {
+    const { word, count, cols } = WD
+    // who says it most: a verdict, unless it's even
+    const lead = P.map((p, i) => [p, i, S.topWords.find(([w]) => w === word)?.[2][i] ?? 0]).sort((a, b) => b[2] - a[2])[0]
+    const pct = count ? Math.round((lead[2] / count) * 100) : 0
+    const said = S.group ? `Paling sering ${first(lead[0].name)}.` : pct >= 56 ? `${pct}% dari ${first(lead[0].name)}.` : 'Sama rata.'
     add({
       id: 'words',
       label: V.words,
@@ -420,6 +443,10 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
         shade(ctx)
         eyebrow(ctx, V.words, 250, MUTED, at(t, late))
         text(ctx, `${num(count)} kali.`, M, 330, head(48, { color: FG, alpha: at(t, late + 0.3) }))
+        // beside it, or under it if a long name won't fit
+        const kw = measure(ctx, `${num(count)} kali. `, head(48))
+        const beside = kw + measure(ctx, said, head(48)) <= W - 2 * M
+        text(ctx, said, beside ? M + kw : M, beside ? 330 : 392, head(48, { color: colorOf(lead[1]), alpha: at(t, late + 0.5) }))
         // per person: what they call the other one (two of you), and their own words — the ones
         // only they say (or, if none, what they say most)
         const colW = (W - 2 * M) / cols.length
@@ -431,23 +458,22 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
           return wd > room ? Math.floor((size * room) / wd) : size
         }
         const times = (n, x, y, a) => text(ctx, `${num(n)}×`, x, y, { size: 28, color: MUTED, align: 'right', alpha: a })
-        cols.forEach((p, pi) => {
+        cols.forEach(({ p, call, own, khas }, pi) => {
           const x = M + pi * colW
           const right = x + colW - 40
           const d = late + 0.6 + pi * 0.12
           let y = S.group ? 1350 : 1330
           text(ctx, first(p.name), x, y, { size: 32, weight: 500, color: colorOf(pi), alpha: at(t, d) })
           const other = !S.group && P[1 - pi]
-          if (other && p.calls) {
+          if (other && call) {
             const to = first(other.name)
             label(`manggil ${to.length > 12 ? `${to.slice(0, 11)}…` : to}`, x, y + 60, at(t, d + 0.15))
-            text(ctx, p.calls[0], x, y + 136, head(fit(p.calls[0], 64, colW - 160), { color: FG, alpha: at(t, d + 0.25), rise: 30 }))
-            times(p.calls[1], right, y + 136, at(t, d + 0.35))
+            text(ctx, call[0], x, y + 136, head(fit(call[0], 64, colW - 160), { color: FG, alpha: at(t, d + 0.25), rise: 30 }))
+            times(call[1], right, y + 136, at(t, d + 0.35))
             y += 150
           }
-          const own = p.signatures.length ? p.signatures.map((x) => [x.word, x.n]) : p.topWords.filter(([w]) => w !== word).slice(0, 3)
-          label(p.signatures.length ? 'kata khas' : 'sering bilang', x, y + 60, at(t, d + 0.45))
-          own.slice(0, 3).forEach(([w, n], i) => {
+          label(khas ? 'kata khas' : 'sering bilang', x, y + 60, at(t, d + 0.45))
+          own.forEach(([w, n], i) => {
             const a = at(t, d + 0.55 + i * 0.12)
             text(ctx, w, x, y + 124 + i * 60, head(fit(w, 46, colW - 140), { color: FG, alpha: a }))
             times(n, right, y + 124 + i * 60, a)

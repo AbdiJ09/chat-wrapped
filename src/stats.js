@@ -159,8 +159,8 @@ export function computeStats({ messages, people }, { title = null } = {}) {
       night: p.night,
       longest: p.longest,
       topWords: [...p.words_.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([w, n]) => [shown(w), n]),
-      // what they call the other one(s) most
-      calls: [...p.calls.entries()].sort((a, b) => b[1] - a[1]).filter(([, n]) => n >= 5).slice(0, 1).map(([w, n]) => [shown(w), n])[0] ?? null,
+      // what they call the other one(s), most first (a few, so one can be hidden)
+      callList: [...p.calls.entries()].sort((a, b) => b[1] - a[1]).filter(([, n]) => n >= 5).slice(0, 4).map(([w, n]) => [shown(w), n]),
       topEmoji: [...p.emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
     }
   })
@@ -177,9 +177,15 @@ export function computeStats({ messages, people }, { title = null } = {}) {
       if (n / (n + others) < 0.7) continue
       list.push({ word: shown(w), n, share: n / (n + others), score: n / (others + 2) })
     }
-    p.signatures = list.sort((a, b) => b.score - a.score).slice(0, 3)
+    p.signatures = list.sort((a, b) => b.score - a.score).slice(0, 8)
     p.signature = p.signatures[0] ?? null
+    p.calls = p.callList[0] ?? null
   }
+
+  // everyone's words together, most first, with how often each of you said it
+  const totals = new Map()
+  for (const name of people) for (const [w, n] of by.get(name).words_) totals.set(w, (totals.get(w) ?? 0) + n)
+  const topWords = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([w, n]) => [shown(w), n, people.map((name) => by.get(name).words_.get(w) ?? 0)])
 
   return {
     people: persons,
@@ -188,6 +194,7 @@ export function computeStats({ messages, people }, { title = null } = {}) {
     total: messages.length,
     words,
     laughs,
+    topWords,
     conversations,
     starters,
     sequence,

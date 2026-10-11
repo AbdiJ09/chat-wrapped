@@ -6,7 +6,7 @@ import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
 import { rename, recolor, renameScenes } from './custom.js'
 import { MAX_SCENES, KINDS, OBJECTS, objectsFor, searchMessages, quoteScene, countScene, dayScene } from './story/scenes.js'
-import { makeStory, posterWords } from './story/slides.js'
+import { makeStory, posterWords, wordsOf } from './story/slides.js'
 import { W, H } from './story/draw.js'
 import { Player } from './player.js'
 import { readSong, suggestStart, snap } from './music/beat.js'
@@ -473,14 +473,14 @@ function songFrame() {
 // colour runs through as a wave, new words appear in place), five steps beside it — the cover's
 // title, your names and colours, your photo and closing words, scenes of your own, which scenes
 // to keep — and the film plays from the last step.
-let gift = null // { photo: a 4:5 canvas or null, message, title, names: { chat name → nickname }, colors: [hex], hidden: Set of slide ids, scenes: your own (story/scenes.js) }
-const newGift = () => ({ photo: null, message: '', title: '', names: {}, colors: [], hidden: new Set(), scenes: [] })
+let gift = null // { photo: a 4:5 canvas or null, message, title, names: { chat name → nickname }, colors: [hex], hidden: Set of slide ids, scenes: your own (story/scenes.js), words: Set of words left off (lowercase) }
+const newGift = () => ({ photo: null, message: '', title: '', names: {}, colors: [], hidden: new Set(), scenes: [], words: new Set() })
 // what the film is made of, with the gift's changes: the stats (renamed), the theme (recoloured),
 // and the premium part for makeStory
 function film() {
   const theme = recolor(chat.theme, gift?.colors)
   const stats = gift ? rename(chat.stats, gift.names) : chat.stats
-  const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names) }
+  const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names), words: gift.words }
   return { stats, theme, premium }
 }
 // the picker's name line follows the title and the nicknames; its studio button, what you've done
@@ -503,6 +503,7 @@ function studioCTA() {
     gift.photo && 'foto',
     gift.message.trim() && 'pesan',
     gift.scenes.length && `${gift.scenes.length} scene kamu`,
+    gift.words?.size && 'kata disembunyiin',
   ].filter(Boolean)
   $('studio-cta-title').textContent = 'Rekap kalian udah di-custom ✓'
   $('studio-cta-sub').textContent = done.length ? `${done.join(' · ')} · ubah lagi` : 'buka studio lagi'
@@ -644,7 +645,31 @@ function fillPeople() {
     })
     .join('')
   $('custom-reset').hidden = !gift.colors.some(Boolean)
+  fillWords()
 }
+// the words the words slide shows — tap one to leave it off (the next one moves up), again to bring it back
+function fillWords() {
+  gift.words ??= new Set()
+  const shown = wordsOf(chat.stats, gift.words)
+  const words = shown ? [[shown.word, shown.count], ...shown.cols.flatMap((c) => [c.call, ...c.own].filter(Boolean))] : []
+  const seen = new Set()
+  const chips = words.filter(([w]) => !seen.has(w.toLowerCase()) && seen.add(w.toLowerCase()))
+  $('custom-words').innerHTML = [
+    ...chips.map(([w, n]) => `<button type="button" class="custom__scene" data-w="${esc(w.toLowerCase())}" aria-pressed="true">${esc(w)}<small>${n.toLocaleString('id-ID')}×</small></button>`),
+    ...[...gift.words].map((w) => `<button type="button" class="custom__scene" data-w="${esc(w)}" aria-pressed="false">${esc(w)}</button>`),
+  ].join('')
+}
+$('custom-words').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-w]')
+  if (!b) return
+  const w = b.dataset.w
+  const before = wordsOf(chat.stats, gift.words)?.word
+  if (gift.words.has(w)) gift.words.delete(w)
+  else gift.words.add(w)
+  fillWords()
+  // a new word on the floor flies in; otherwise only the words below change
+  preview('words', pv?.id === 'words' && wordsOf(chat.stats, gift.words)?.word === before ? 'words' : 'fly')
+})
 function setColor(i, c) {
   gift.colors[i] = c
   fillPeople()
