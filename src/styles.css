@@ -454,7 +454,15 @@ body.is-reading::before { opacity: 1; }
 .flash.is-soft { background: radial-gradient(circle at 50% 46%, #fff, color-mix(in srgb, var(--accent) 60%, transparent) 40%, transparent 75%); }
 
 /* the picker: who, what, and the vibes; it builds itself in */
-.picker { position: fixed; z-index: 2; --dir: 1; }
+.picker { position: fixed; z-index: 2; --dir: 1; justify-content: safe center; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.picker::-webkit-scrollbar { display: none; }
+/* a short screen: everything a size smaller, so it all fits (and if not, it scrolls) */
+@media (max-height: 860px) {
+  .picker .picker__title { font-size: clamp(2rem, 3.6vw, 3.2rem); margin-bottom: 0.8rem; }
+  .picker .stats { margin-bottom: 0.8rem; }
+  .picker .drum { font-size: clamp(2.1rem, 3.8vw, 3.6rem); }
+  .picker .song { margin-top: 1rem; }
+}
 .picker .col { max-width: 38rem; }
 .picker .tag { margin-bottom: 1.2rem; }
 .picker .picker__title { font-size: clamp(2.4rem, 4.6vw, 4.4rem); margin-bottom: 1.2rem; }
@@ -476,7 +484,9 @@ body.is-reading::before { opacity: 1; }
    one quiet line until you add one; then its waveform, drawn like a voice note, the part the film
    plays lit up and draggable */
 .song { margin-top: 1.4rem; max-width: 30rem; }
+.song + .gift { margin-top: 1rem; }
 .picker.is-entering .song { animation: in 1s cubic-bezier(0.16, 1, 0.3, 1) 0.9s both; }
+.picker.is-entering .gift { animation-delay: 1s; }
 .song__add { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; text-align: left; color: var(--ink); }
 .song__icon { display: inline-grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 0.9rem; align-self: center; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s; }
 .song__label { font-weight: 500; }
@@ -492,6 +502,23 @@ body.is-reading::before { opacity: 1; }
 .song__top b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .song__x { flex: none; margin-left: auto; width: 1.7rem; height: 1.7rem; border-radius: 50%; color: var(--muted); font-size: 1.1rem; line-height: 1; transition: color 0.2s, background 0.2s; }
 .song__x:hover { color: var(--ink); background: var(--faint); }
+
+.gift { margin-top: 1rem; }
+.gift__icon { font-size: 0.8rem; }
+.gift__badge { flex: none; padding: 0.15rem 0.55rem; border-radius: 999px; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.gift__deck { padding-bottom: 0; }
+.gift__row { display: flex; gap: 0.8rem; align-items: stretch; }
+.gift__photo { position: relative; flex: none; width: 76px; aspect-ratio: 4 / 5; border-radius: 14px; overflow: hidden; display: grid; place-content: center; justify-items: center; gap: 0.15rem; border: 1.5px dashed color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); transition: border-color 0.25s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.gift__photo:hover { border-color: var(--accent); transform: scale(1.04) rotate(-2deg); }
+.gift__photo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gift__photo.has-photo { border-style: solid; border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.gift__photo.has-photo .gift__plus, .gift__photo.has-photo .gift__photo-label { display: none; }
+.gift__plus { font-size: 1.3rem; line-height: 1; }
+.gift__photo-label { font-size: 0.66rem; color: var(--muted); }
+.gift__message { flex: 1; min-width: 0; resize: none; padding: 0.7rem 0.85rem; border-radius: 14px; border: 1px solid var(--faint); background: rgba(255, 255, 255, 0.04); color: var(--ink); font: inherit; font-size: 0.9rem; line-height: 1.4; outline: none; transition: border-color 0.25s, background 0.25s; }
+.gift__message::placeholder { color: var(--muted); }
+.gift__message:focus { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: rgba(255, 255, 255, 0.06); }
+.gift__incl { margin: 0.6rem 0 0; font-size: 0.78rem; color: var(--muted); }
 
 .song__wave { position: relative; height: 54px; cursor: grab; touch-action: none; outline: none; border-radius: 12px; }
 .song__wave.is-dragging { cursor: grabbing; }
@@ -644,6 +671,7 @@ body.is-reading::before { opacity: 1; }
 @media (max-aspect-ratio: 11/10) {
   .scrim { background: linear-gradient(0deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 88%, transparent) 40%, transparent 66%); }
   .scene, .picker { justify-content: flex-end; padding-bottom: 92px; }
+  .picker { justify-content: safe flex-end; }
   .chip { top: calc(7% + var(--y) * 0.24); left: calc(var(--x) - 50%); }
   .chip[data-i='2'], .hero .chip { display: none; }
   .chip b { font-size: 1.05rem; }

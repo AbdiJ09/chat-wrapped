@@ -23,6 +23,31 @@ export async function slideImage(story, i) {
   return new Promise((resolve) => c.toBlob(resolve, 'image/png'))
 }
 
+/**
+ * premium: a poster to print (A-paper shaped, 2000 × 2828): slide i's sculpture, fully formed,
+ * under words(ctx, h) laid out 1080 wide.
+ */
+export async function posterImage(story, i, words) {
+  const PW = 2000
+  const PH = Math.round(PW * Math.SQRT2)
+  const c = document.createElement('canvas')
+  c.width = PW
+  c.height = PH
+  const ctx = c.getContext('2d')
+  const { engine } = story
+  const prev = { ...engine.size }
+  engine.resize(PW, PH, 1)
+  engine.render(i, story.slides[i].duration)
+  ctx.drawImage(engine.canvas, 0, 0, PW, PH)
+  if (prev.w) engine.resize(prev.w, prev.h, prev.pr)
+  const k = PW / W
+  ctx.save()
+  ctx.scale(k, k)
+  words(ctx, PH / k)
+  ctx.restore()
+  return new Promise((resolve) => c.toBlob(resolve, 'image/png'))
+}
+
 const STALL = 6000 // ms
 const STALLED = 'Browser ini berhenti di tengah bikin video. Coba pakai Chrome, atau simpan gambarnya saja.'
 

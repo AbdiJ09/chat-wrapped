@@ -94,3 +94,22 @@ test('messages pasted into a message stay part of it', () => {
   assert.deepEqual(ios.people, ['Hari', 'Uraaatu'])
   assert.equal(ios.messages.length, 3)
 })
+
+test('premium moments: the first "sayang", who says it more, the longest silence', async () => {
+  const { computeMoments } = await import('../src/moments.js')
+  const { messages, people } = parseWhatsApp([
+    '01/03/24 20.00 - Hari: halo',
+    '01/03/24 20.01 - Uraaatu: hai wkwk',
+    '02/03/24 21.00 - Hari: sayang udah makan?',
+    '02/03/24 21.02 - Uraaatu: udah syg, kangen',
+    '09/03/24 08.00 - Uraaatu: pagi',
+    '09/03/24 08.05 - Hari: pagi juga, love you',
+  ].join('\n'))
+  const m = computeMoments(messages, people)
+  assert.equal(m.first.love.author, 'Hari')
+  assert.equal(m.first.laugh.author, 'Uraaatu')
+  assert.deepEqual(m.counts.couple, { Hari: 2, Uraaatu: 2 })
+  assert.equal(m.silence.breaker, 'Uraaatu')
+  assert.equal(m.silence.text, 'pagi')
+  assert.equal(Math.round(m.silence.ms / 3600000), 6 * 24 + 11)
+})

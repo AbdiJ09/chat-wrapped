@@ -578,3 +578,95 @@ export function core(N, A, seed = 16) {
   }
   return s
 }
+
+// — premium: your photo, made of your messages. A wall of bubbles standing on the floor, each one
+// a pixel of it; the light parts stand a little forward, so it has a relief —
+// photo: a canvas (any size, already cropped to 4:5)
+export function portrait(N, A, photo, seed = 17) {
+  const r = rng(seed)
+  const s = make(N)
+  const width = 2.2
+  const height = width * 1.25
+  // bubbles are wider than tall: rows closer than columns
+  const want = Math.floor(N * 0.97)
+  const c = Math.sqrt((width * height) / (0.66 * want))
+  const cols = Math.floor(width / c)
+  const rows = Math.min(Math.floor(want / cols), Math.floor(height / (0.66 * c)))
+  // the photo at one pixel per bubble (stepping down in halves, so it's averaged, not aliased)
+  let src = photo
+  while (src.width / 2 > cols * 2) {
+    const half = document.createElement('canvas')
+    half.width = Math.round(src.width / 2)
+    half.height = Math.round(src.height / 2)
+    half.getContext('2d').drawImage(src, 0, 0, half.width, half.height)
+    src = half
+  }
+  const small = document.createElement('canvas')
+  small.width = cols
+  small.height = rows
+  const g = small.getContext('2d', { willReadFrequently: true })
+  g.imageSmoothingQuality = 'high'
+  g.drawImage(src, 0, 0, cols, rows)
+  const px = g.getImageData(0, 0, cols, rows).data
+  const lin = (v) => Math.pow(v / 255, 2.2)
+  let k = 0
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++, k++) {
+      const i = ((rows - 1 - y) * cols + x) * 4
+      const col = [lin(px[i]), lin(px[i + 1]), lin(px[i + 2])]
+      const lum = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2]
+      const X = (x - (cols - 1) / 2) * c
+      const Y = 0.32 + y * c * 0.66
+      put(s, k, X, Y, Math.sqrt(lum) * 0.16 + gauss(r) * 0.012, col, { rx: gauss(r) * 0.06, ry: gauss(r) * 0.08, size: c * 1.12, bright: 1.25 })
+    }
+  }
+  for (; k < N; k++) scatter(s, k, r, A, { from: 2.4 })
+  return s
+}
+
+// — premium: who says it more: a tower per person, as tall as how often they said it —
+export function towers(N, A, values, seed = 18) {
+  const r = rng(seed)
+  const s = make(N)
+  const n = values.length
+  const total = values.reduce((a, b) => a + b, 0) || 1
+  const max = Math.max(...values, 1)
+  // the tallest tower gets about half the bubbles; the others in proportion
+  const budget = Math.floor(N * 0.5)
+  const quota = values.map((v) => Math.max(v ? 6 : 0, Math.round((v / max) * budget * Math.min(1, (max * n) / total + 0.2))))
+  const size = n > 2 ? 0.22 : 0.3
+  const per = n > 2 ? 5 : 9
+  const thick = Math.min(1.6, 1.5 / ((Math.max(...quota, 1) / per) * BUBBLE_DEPTH * size))
+  const gap = n > 2 ? 0.55 : 1.15
+  let k = 0
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < quota[i] && k < N; j++, k++) pile(s, k, j, { x: (i - (n - 1) / 2) * gap, z: 0, per, size, thick, c: PALETTE[i], spin: 0.1, radius: size * 0.6 })
+  }
+  for (; k < N; k++) scatter(s, k, r, A)
+  return s
+}
+
+// — premium: the longest silence: the two of you far apart, and only a trail of a few bubbles
+// across the empty floor between —
+export function apart(N, A, seed = 19) {
+  const r = rng(seed)
+  const s = make(N)
+  const trail = 7
+  for (let k = 0; k < N; k++) {
+    const side = A[k] % 2
+    const cx = side ? 0.85 : -0.85
+    if (k < trail) {
+      const x = -0.55 + ((k + 0.5) / trail) * 1.1
+      put(s, k, x, 0.012, 0.3 + Math.sin(k * 1.7) * 0.05, CREAM, { rx: FLAT, rz: r() * 6, size: 0.06, bright: 0.5 })
+      continue
+    }
+    // a loose ball each, slowly turning; the rest of the floor stays empty (the others shrink
+    // away into the balls)
+    const u = r() * 2 - 1
+    const a = r() * Math.PI * 2
+    const rad = 0.42 * Math.cbrt(r())
+    const q = Math.sqrt(1 - u * u)
+    put(s, k, cx + Math.cos(a) * q * rad, 0.95 + u * rad, Math.sin(a) * q * rad, PALETTE[side], { rx: r() * 6, ry: r() * 6, size: k % 3 === 0 ? 0.1 : 0 })
+  }
+  return s
+}

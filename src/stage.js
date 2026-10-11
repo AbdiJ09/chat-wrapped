@@ -19,6 +19,8 @@ const SCENES = {
   cover: { cam: { pos: [0, 2.4, 11.4], look: [0, 1.35, 0], orbit: 0.3, speed: 0.15 } },
   spark: { cam: { pos: [0, 2.1, 8.2], look: [0, 1.1, 0], orbit: 0.35, speed: 0.15 } },
   vortex: { cam: { pos: [0, 2.2, 10.5], look: [0, 1.75, 0], orbit: 0, speed: 0 } },
+  // premium: your photo, made of your chat
+  portrait: { cam: { pos: [0, 2.0, 9.6], look: [0, 1.65, 0], orbit: 0.18, speed: 0.12 } },
   // reading your chat: close up on one bright ball
   core: { cam: { pos: [0, 1.75, 6.4], look: [0, 1.5, 0], orbit: 0.4, speed: 0.6 } },
   // the way out: everything flies up into the sky
@@ -46,6 +48,7 @@ function build(name, S, N, theme) {
     case 'spark': return shapes.spark(N, A, 0)
     case 'vortex': return shapes.vortex(N, A)
     case 'core': return shapes.core(N, A)
+    case 'portrait': return shapes.portrait(N, A, S.photo)
     default: return shapes.nebula(N, A)
   }
 }
@@ -139,6 +142,12 @@ export class Stage {
     // the same sculpture, only the colours change: a wave; otherwise a flight
     if (settled && form(this.name, was) === form(this.name, theme)) this.engine.flipTo(this.mode === 'scroll' ? this.#reel() : this.#slide(this.name))
     else this.#timed(this.name, null, this.mode === 'scroll' || this.then)
+  }
+
+  /** premium: your photo for the 'portrait' sculpture (a 4:5 canvas). */
+  setPhoto(photo) {
+    this.stats = { ...this.stats, photo }
+    for (const key of this.cache.keys()) if (key.startsWith('portrait:')) this.cache.delete(key)
   }
 
   /** Play another chat (the one you picked), or the demo again (takes effect at the next flight). */

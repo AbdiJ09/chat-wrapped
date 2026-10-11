@@ -1,11 +1,12 @@
 import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
-import { makeStory } from './story/slides.js'
+import { computeMoments } from './moments.js'
+import { makeStory, posterWords } from './story/slides.js'
 import { Player } from './player.js'
 import { readSong, suggestStart, snap } from './music/beat.js'
 import { Track } from './music/track.js'
-import { slideImage, storyVideo, canMakeVideo } from './export.js'
+import { slideImage, posterImage, storyVideo, canMakeVideo } from './export.js'
 import { Engine } from './three/engine.js'
 import { Stage } from './stage.js'
 import { Drum } from './drum.js'
@@ -408,6 +409,9 @@ $('song-drop').addEventListener('click', () => {
   song = null
   $('song-hint').textContent = HINT
   songUI()
+  gift = null
+  $('gift-message').value = ''
+  giftUI()
   composerPlay()
 })
 // slide the lit part along (it snaps to a beat when you let go); a tap without sliding: play/pause
@@ -458,6 +462,70 @@ function songFrame() {
   if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
 }
 
+// — premium ("make it a gift"): no payment yet, it simply turns on —
+// Your photo (the bubbles build it, right here in the picker, and at the end of the film), your
+// own words to end on, the chapters of your moments, no watermark, and a poster.
+let gift = null // { photo: a 4:5 canvas or null, message }
+const giftPhoto = $('gift-photo')
+function giftUI() {
+  $('gift-add').hidden = !!gift
+  $('gift-deck').hidden = !gift
+  $('gift-message').placeholder = `Pesan penutup buat ${chat?.stats.group ? 'mereka' : 'dia'}… (opsional)`
+  if (!gift) return
+  const c = giftPhoto.querySelector('canvas')
+  giftPhoto.classList.toggle('has-photo', !!gift.photo)
+  c.hidden = !gift.photo
+  if (gift.photo) {
+    c.width = gift.photo.width
+    c.height = gift.photo.height
+    c.getContext('2d').drawImage(gift.photo, 0, 0)
+  }
+}
+$('gift-add').addEventListener('click', () => {
+  gift = { photo: null, message: $('gift-message').value }
+  giftUI()
+})
+$('gift-drop').addEventListener('click', () => {
+  const had = gift?.photo
+  gift = null
+  giftUI()
+  if (had && view === 'picker') stage.show('cover', { theme: chat.theme })
+})
+giftPhoto.addEventListener('click', () => $('gift-file').click())
+$('gift-message').addEventListener('input', (e) => gift && (gift.message = e.target.value))
+// a photo: turned the right way up, cropped to 4:5 (a little above the middle, where faces are)
+async function cropPhoto(file) {
+  const img = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(async () => {
+    const el = new Image()
+    el.src = URL.createObjectURL(file)
+    await el.decode()
+    return el
+  })
+  const w = img.width
+  const h = img.height
+  const cw = Math.min(w, (h * 4) / 5)
+  const ch = (cw * 5) / 4
+  const c = document.createElement('canvas')
+  c.width = 480
+  c.height = 600
+  c.getContext('2d').drawImage(img, (w - cw) / 2, (h - ch) * 0.3, cw, ch, 0, 0, c.width, c.height)
+  return c
+}
+$('gift-file').addEventListener('change', async () => {
+  const file = $('gift-file').files[0]
+  $('gift-file').value = ''
+  if (!file || !gift) return
+  try {
+    gift.photo = await cropPhoto(file)
+    giftUI()
+    // the bubbles build it, now
+    stage.setPhoto(gift.photo)
+    stage.show('portrait', { force: true, style: 'fly' })
+  } catch (err) {
+    console.error(err)
+  }
+})
+
 // — reading a chat —
 
 // "WhatsApp Chat with Nadia.txt", "Chat WhatsApp dengan Liburan.zip", "WhatsApp Chat - Nadia.zip"
@@ -484,6 +552,7 @@ function analyse(text, title) {
   if (parsed.people.length < 2) throw new Error('Chat ini cuma berisi satu orang. Coba chat dengan orang lain atau grup.')
   if (parsed.messages.length < 30) throw new Error('Chat-nya terlalu pendek untuk diceritain. Coba chat yang lebih panjang.')
   const stats = computeStats(parsed, { title: parsed.people.length > 2 ? title : null })
+  stats.moments = computeMoments(parsed.messages, parsed.people)
   return { stats, guess: detectTheme(stats, text) }
 }
 
@@ -617,6 +686,11 @@ async function showPicker({ stats, guess }) {
   composer.classList.remove('is-away')
   composerPlay()
   if (song) songUI()
+  giftUI()
+  if (gift?.photo) {
+    stage.setPhoto(gift.photo)
+    stage.show('portrait', { force: true })
+  }
 }
 
 async function handle(file) {
@@ -660,9 +734,10 @@ async function play() {
   $('flash').classList.remove('is-soft')
   restart($('flash'), 'is-on')
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
-  const slides = makeStory(stats, N, theme)
+  const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message }
+  const slides = makeStory(stats, N, theme, premium)
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
-  story = { engine, slides }
+  story = { engine, slides, premium }
   picker.hidden = true
   landing.hidden = true
   storyView.hidden = false
@@ -672,6 +747,7 @@ async function play() {
   player?.destroy()
   player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, music: song && { track: song.track, start: song.start } })
   $('save-video').hidden = !canMakeVideo()
+  $('save-poster').hidden = !premium
   // the video is silent: on Instagram, the song goes on from where it starts here
   $('save-video').querySelector('small').textContent = song ? `Tanpa suara · di IG, mulai lagunya dari ${mmss(song.start)}` : 'MP4 1080×1920, siap story & reels'
   composerSay(SAVE, 'save')
@@ -689,6 +765,9 @@ function back() {
   song = null
   $('song-hint').textContent = HINT
   songUI()
+  gift = null
+  $('gift-message').value = ''
+  giftUI()
   storyView.hidden = true
   picker.hidden = true
   $('reading').hidden = true
@@ -843,6 +922,14 @@ $('save').addEventListener('click', () =>
     const blob = await slideImage(story, player.i)
     await deliver(blob, `chat-wrapped-${pad(player.i + 1)}.png`, 'image/png')
   }))
+$('save-poster').addEventListener('click', () =>
+  saving('Menyiapkan poster…', async () => {
+    const { stats, theme } = chat
+    // the ending's sculpture (your photo), or the cover's
+    const i = story.premium.photo || story.premium.message.trim() ? story.slides.length - 1 : 0
+    const blob = await posterImage(story, i, posterWords(stats, theme, story.premium))
+    await deliver(blob, 'chat-wrapped-poster.png', 'image/png')
+  }))
 $('save-all').addEventListener('click', () =>
   saving('Menyiapkan semua gambar…', async (say) => {
     const files = {}
@@ -870,4 +957,4 @@ $('again').addEventListener('click', () => {
   back()
 })
 
-if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, THEMES, setChat: (c) => (chat = c), get song() { return song } }
+if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, posterImage, posterWords, THEMES, setChat: (c) => (chat = c), get song() { return song }, get gift() { return gift }, setGift: (g) => ((gift = g), giftUI()) }

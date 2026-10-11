@@ -28,6 +28,15 @@ const VOICE = {
   },
 }
 
+// premium: the chapters' titles, per theme
+const MOMENTS = {
+  couple: { first: ['love', 'Pertama kali bilang sayang'], count: 'Siapa yang lebih bucin', unit: 'kali bilang sayang, kangen, love you', quiet: 'Paling lama diem-dieman' },
+  bestie: { first: ['laugh', 'Pertama kali ketawa bareng'], count: 'Siapa paling heboh', unit: 'kali bilang anjir, gila, buset', quiet: 'Paling lama nggak ngobrol' },
+  squad: { first: ['laugh', 'Pertama kali grup ini ketawa'], count: 'Siapa paling heboh', unit: 'kali bilang anjir, gila, buset', quiet: 'Grup paling lama sepi' },
+  family: { first: ['laugh', 'Pertama kali ketawa bareng'], count: 'Siapa paling perhatian', unit: 'kali nanya udah makan & bilang hati-hati', quiet: 'Paling lama sepi' },
+  work: { first: ['laugh', 'Pertama kali ada yang ketawa'], count: 'Siapa paling sopan', unit: 'kali bilang makasih & maaf', quiet: 'Paling lama sepi' },
+}
+
 const first = (name) => name.split(/\s+/)[0]
 const years = (S) => `${S.start.getFullYear()}${S.end.getFullYear() !== S.start.getFullYear() ? `–${S.end.getFullYear()}` : ''}`
 const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
@@ -60,7 +69,11 @@ function shade(ctx, top = true) {
 /** Words appear a beat after the bubbles start landing. */
 const late = 1.1
 
-export function makeStory(S, N, theme) {
+/**
+ * premium (or null): { moments (computeMoments), photo (a 4:5 canvas, or null), message (your
+ * words for the end, or '') } — adds the chapters, the ending, and takes the watermark off
+ */
+export function makeStory(S, N, theme, premium = null) {
   shapes.usePalette(theme)
   const A = shapes.authors(S, N)
   const P = S.people
@@ -121,6 +134,33 @@ export function makeStory(S, N, theme) {
         lines.forEach((l, i) => text(ctx, l, M, y0 + i * size * 1.05, head(size, { color: FG, alpha: at(t, late + 0.5 + i * 0.15, 1.2), rise: 50 })))
         text(ctx, `— ${m.author}`, M, y0 + lines.length * size * 1.05 + 24, { size: 38, weight: 500, color: colorOf(ai), alpha: at(t, late + 1.3) })
         if (ago > 0) text(ctx, `${num(ago)} hari yang lalu.`, M, 1740, head(54, { color: FG, alpha: at(t, late + 2.1, 1.2) }))
+      },
+    })
+  }
+
+  // — premium: the first time one of you said it —
+  const PM = MOMENTS[theme.id]
+  const firstOf = premium?.moments.first[PM.first[0]]
+  if (firstOf) {
+    const m = firstOf
+    const ai = Math.max(0, P.findIndex((p) => p.name === m.author))
+    const d = new Date(m.t)
+    const after = S.first ? Math.round((m.t - S.first.t) / 86400000) : 0
+    add({
+      duration: 7,
+      shape: shapes.words(N, A, `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`, { width: 1.9 }),
+      cam: { pos: [0, 1.6, 8.4], look: [0, 0.35, 0], orbit: 0.3, speed: 0.3 },
+      words(ctx, t) {
+        shade(ctx)
+        eyebrow(ctx, PM.first[1], 250, MUTED, at(t, late))
+        text(ctx, date(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }), M, 310, { size: 32, color: MUTED, alpha: at(t, late + 0.2) })
+        const quote = m.text.length > 110 ? `${m.text.slice(0, 107)}…` : m.text
+        const size = quote.length < 24 ? 110 : quote.length < 60 ? 80 : 58
+        const lines = wrap(ctx, `“${quote}”`, W - 2 * M, head(size)).slice(0, 4)
+        const y0 = 1300
+        lines.forEach((l, i) => text(ctx, l, M, y0 + i * size * 1.05, head(size, { color: FG, alpha: at(t, late + 0.5 + i * 0.15, 1.2), rise: 50 })))
+        text(ctx, `— ${m.author}, duluan.`, M, y0 + lines.length * size * 1.05 + 24, { size: 38, weight: 500, color: colorOf(ai), alpha: at(t, late + 1.3) })
+        if (after > 0) text(ctx, `${num(after)} hari setelah pesan pertama.`, M, 1740, head(50, { color: FG, alpha: at(t, late + 2.1, 1.2) }))
       },
     })
   }
@@ -194,6 +234,39 @@ export function makeStory(S, N, theme) {
         })
       },
     })
+  }
+
+  // — premium: who says it more —
+  if (premium) {
+    const said = premium.moments.counts[theme.id]
+    const who6 = (S.group ? top6 : P.slice(0, 2)).map((p) => ({ p, n: said[p.name] ?? 0 }))
+    const sum = who6.reduce((a, x) => a + x.n, 0)
+    if (sum >= 5) {
+      const ranked = [...who6].sort((a, b) => b.n - a.n)
+      const win = ranked[0]
+      add({
+        duration: 7,
+        shape: shapes.towers(N, A, who6.map((x) => x.n)),
+        cam: { pos: [0, 2.1, 8.4], look: [0, 1.0, 0], orbit: 0.3, speed: 0.2 },
+        words(ctx, t) {
+          shade(ctx)
+          eyebrow(ctx, PM.count, 250, MUTED, at(t, late))
+          text(ctx, first(win.p.name), M, 430, big(170, { color: colorOf(P.indexOf(win.p)), alpha: at(t, late + 0.2), rise: 50 }))
+          const k = easeInOut(clamp((t - late) / 1.6))
+          text(ctx, `${num(win.n * k)} ${PM.unit}.`, M, 510, head(40, { color: FG, alpha: at(t, late + 0.4) }))
+          ranked.slice(0, 4).forEach(({ p, n }, i) => {
+            const y = 1460 + i * 92
+            const a = at(t, late + 0.8 + i * 0.15)
+            text(ctx, first(p.name), M, y, { size: 40, weight: 500, color: colorOf(P.indexOf(p)), alpha: a })
+            text(ctx, `${num(n * k)}×`, W - M, y, head(56, { color: FG, align: 'right', alpha: a }))
+          })
+          if (!S.group && ranked[1].n > 0 && win.n > ranked[1].n * 1.15) {
+            const x = win.n / ranked[1].n
+            text(ctx, `${x.toFixed(x < 10 ? 1 : 0).replace('.', ',')}× lebih sering dari ${first(ranked[1].p.name)}.`, M, 1740, { size: 32, color: MUTED, alpha: at(t, late + 1.6) })
+          } else if (!S.group) text(ctx, ranked[0].n === ranked[1].n ? 'Seri. Sama persis.' : `Tipis. Cuma beda ${num(ranked[0].n - ranked[1].n)}.`, M, 1740, { size: 32, color: MUTED, alpha: at(t, late + 1.6) })
+        },
+      })
+    }
   }
 
   // — 5. who says hello first —
@@ -277,6 +350,31 @@ export function makeStory(S, N, theme) {
     },
   })
 
+  // — premium: the longest the chat went quiet, and who broke it —
+  const quiet = premium?.moments.silence
+  if (quiet && quiet.ms >= 12 * 3600000) {
+    const bi = Math.max(0, P.findIndex((p) => p.name === quiet.breaker))
+    const days = quiet.ms / 86400000
+    const long = days >= 2 ? `${num(Math.floor(days))} hari` : `${num(Math.floor(quiet.ms / 3600000))} jam`
+    const short = { day: 'numeric', month: 'short', year: 'numeric' }
+    add({
+      duration: 7,
+      shape: shapes.apart(N, A),
+      cam: { pos: [0, 2.2, 9.2], look: [0, 0.8, 0], orbit: 0.15, speed: 0.12 },
+      words(ctx, t) {
+        shade(ctx)
+        eyebrow(ctx, PM.quiet, 250, MUTED, at(t, late))
+        text(ctx, long, M, 440, big(190, { color: FG, alpha: at(t, late + 0.2), rise: 50 }))
+        text(ctx, `${date(new Date(quiet.from), short)} – ${date(new Date(quiet.to), short)}`, M, 520, { size: 34, color: MUTED, alpha: at(t, late + 0.4) })
+        text(ctx, `Lalu ${first(quiet.breaker)} yang nyapa duluan:`, M, 1420, { size: 38, weight: 500, color: colorOf(bi), alpha: at(t, late + 1) })
+        if (quiet.text) {
+          const q = quiet.text.length > 90 ? `${quiet.text.slice(0, 87)}…` : quiet.text
+          wrap(ctx, `“${q}”`, W - 2 * M, head(64)).slice(0, 3).forEach((l, i) => text(ctx, l, M, 1510 + i * 70, head(64, { color: FG, alpha: at(t, late + 1.3 + i * 0.15), rise: 40 })))
+        }
+      },
+    })
+  }
+
   // — 9. words —
   const all = new Map()
   for (const p of P) for (const [w, c] of p.topWords) all.set(w, (all.get(w) ?? 0) + c)
@@ -359,14 +457,85 @@ export function makeStory(S, N, theme) {
     },
   })
 
+  // — premium: the ending: your photo, made of every message, and your own words typed in —
+  if (premium && (premium.photo || premium.message)) {
+    const msg = premium.message.trim()
+    add({
+      duration: msg ? Math.min(14, 9 + msg.length / 30) : 9,
+      shape: premium.photo ? shapes.portrait(N, A, premium.photo) : theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
+      cam: premium.photo ? { pos: [0, 1.6, 10.6], look: [0, 1.15, 0], orbit: 0.12, speed: 0.12, dolly: 0.006 } : { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
+      words(ctx, t) {
+        shade(ctx, false)
+        text(ctx, `${num(S.total)} pesan, jadi ini.`.toUpperCase(), M, 1390, { size: 26, family: MONO, weight: 500, spacing: 3, color: MUTED, alpha: at(t, 2.2) })
+        if (msg) {
+          // typed in, a letter at a time, after the picture has formed
+          const shown = msg.slice(0, Math.max(0, Math.floor((t - 2.6) * 26)))
+          const size = msg.length < 50 ? 76 : msg.length < 110 ? 60 : 48
+          const lines = wrap(ctx, msg, W - 2 * M, head(size)).slice(0, 6)
+          let left = shown.length
+          lines.forEach((l, i) => {
+            const part = l.slice(0, Math.max(0, left))
+            left -= l.length + 1
+            if (part) text(ctx, part, M, 1490 + i * size * 1.12, head(size, { color: FG, alpha: 1, rise: 0 }))
+          })
+        } else text(ctx, who, M, 1510, big(110, { color: FG, alpha: at(t, 2.6), rise: 50 }))
+      },
+    })
+  }
+
   for (const s of slides) {
     const draw = s.words
     s.words = (ctx, t) => {
       draw(ctx, t)
-      text(ctx, 'chatwrapped', M, H - 84, { size: 26, family: DISPLAY, weight: 800, spacing: -0.5, color: theme.accent, alpha: at(t, 0.2, 1), rise: 0 })
+      if (!premium) text(ctx, 'chatwrapped', M, H - 84, { size: 26, family: DISPLAY, weight: 800, spacing: -0.5, color: theme.accent, alpha: at(t, 0.2, 1), rise: 0 })
       text(ctx, who, W - M, H - 84, { size: 24, family: MONO, color: MUTED, align: 'right', alpha: at(t, 0.2, 1), rise: 0 })
       drawGrain(ctx, 0.04)
     }
   }
   return slides
+}
+
+/**
+ * premium: the words of the poster (a print, A-paper shaped), drawn over the ending's sculpture.
+ * Laid out on a page 1080 wide and h tall.
+ */
+export function posterWords(S, theme, premium) {
+  const P = S.people
+  const FG = theme.ink
+  const MUTED = `${theme.ink}a0`
+  const who = S.group ? S.title ?? `${P.length} orang` : `${P[0].name} & ${P[1].name}`
+  const starter = [...P].sort((a, b) => b.starts - a.starts)[0]
+  return (ctx, h) => {
+    let g = ctx.createLinearGradient(0, h * 0.5, 0, h)
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(1, 'rgba(0,0,0,0.72)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, h * 0.5, W, h * 0.5)
+    const msg = premium.message.trim()
+    if (msg) {
+      g = ctx.createLinearGradient(0, 0, 0, h * 0.3)
+      g.addColorStop(0, 'rgba(0,0,0,0.55)')
+      g.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, h * 0.3)
+      wrap(ctx, `“${msg}”`, W - 2 * M, head(40)).slice(0, 4).forEach((l, i) => text(ctx, l, M, 120 + i * 48, head(40, { color: FG })))
+    }
+    const y0 = h - 520
+    text(ctx, `${years(S)} · ${num(S.spanDays)} hari`.toUpperCase(), M, y0, { size: 22, family: MONO, weight: 500, spacing: 3, color: MUTED })
+    const lines = wrap(ctx, who, W - 2 * M, big(104)).slice(0, 2)
+    lines.forEach((l, i) => text(ctx, l, M, y0 + 110 + i * 100, big(104, { color: FG })))
+    const cells = [
+      ['Pesan', num(S.total)],
+      ['Hari ngobrol', num(S.activeDays)],
+      ['Rekor beruntun', `${num(S.streak.length)} hari`],
+      ['Nyapa duluan', first(starter.name)],
+    ]
+    const cw = (W - 2 * M) / cells.length
+    cells.forEach(([label, value], i) => {
+      const x = M + i * cw
+      text(ctx, label.toUpperCase(), x, h - 170, { size: 17, family: MONO, weight: 500, spacing: 2, color: MUTED })
+      text(ctx, value, x, h - 110, big(46, { color: i === 0 ? theme.accent : FG }))
+    })
+    drawGrain(ctx, 0.035)
+  }
 }
