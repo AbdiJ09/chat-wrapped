@@ -165,11 +165,12 @@ export function makeStory(S, N, theme) {
     const podiumTop = ranked.slice(0, 3).map((p) => Math.min(P.indexOf(p), 7))
     const active = P.filter((p) => p.messages >= 5)
     const most = (f) => [...active].sort((a, b) => f(b) - f(a))[0]
+    const quicker = (a, b) => a.replyMedian - b.replyMedian || a.replyMean - b.replyMean
     const awards = []
     awards.push(['Si paling bawel', ranked[0], `${num(ranked[0].messages)} pesan`])
     const owl = most((p) => p.night / p.messages)
     if (owl?.night) awards.push(['Si paling malam', owl, `${Math.round((owl.night / owl.messages) * 100)}% pesannya lewat jam 12`])
-    const quick = most((p) => -(p.replyMedian ?? 1e12))
+    const quick = active.filter((p) => p.replyMedian != null).sort(quicker)[0]
     if (quick?.replyMedian != null) awards.push(['Si paling fast respon', quick, `bales dalam ${duration(quick.replyMedian)}`])
     const funny = most((p) => p.laughs / p.messages)
     if (funny?.laughs) awards.push(['Si paling receh', funny, `${num(funny.laughs)}× wkwk`])
@@ -212,9 +213,9 @@ export function makeStory(S, N, theme) {
   // — 6. reply speed —
   const R = P.filter((p) => p.replyMedian != null).slice(0, S.group ? 4 : 2)
   if (R.length) {
-    const maxMed = Math.max(...R.map((p) => p.replyMedian))
-    const speeds = top6.map((p) => (p.replyMedian ? 0.35 + 1.6 * (1 - p.replyMedian / (maxMed * 1.15)) : 0.3))
-    const sorted = [...R].sort((a, b) => a.replyMedian - b.replyMedian)
+    const maxMean = Math.max(...R.map((p) => p.replyMean))
+    const speeds = top6.map((p) => (p.replyMean != null && maxMean ? 0.35 + 1.6 * (1 - p.replyMean / (maxMean * 1.15)) : 0.3))
+    const sorted = [...R].sort((a, b) => a.replyMedian - b.replyMedian || a.replyMean - b.replyMean)
     const fast = sorted[0]
     add({
       duration: 6.5,
@@ -231,7 +232,7 @@ export function makeStory(S, N, theme) {
           text(ctx, first(p.name), M, y, { size: 40, weight: 500, color: colorOf(P.indexOf(p)), alpha: a })
           text(ctx, duration(p.replyMedian), W - M, y, head(56, { color: FG, align: 'right', alpha: a }))
         })
-        if (!S.group && sorted.length === 2 && sorted[1].replyMedian > sorted[0].replyMedian * 1.4) {
+        if (!S.group && sorted.length === 2 && sorted[0].replyMedian > 0 && sorted[1].replyMedian > sorted[0].replyMedian * 1.4) {
           const x = sorted[1].replyMedian / sorted[0].replyMedian
           text(ctx, `${x.toFixed(x < 10 ? 1 : 0).replace('.', ',')}× lebih cepet. Cincinnya muter lebih kenceng.`, M, 1740, { size: 30, color: MUTED, alpha: at(t, late + 1.6) })
         }

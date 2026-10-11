@@ -21,6 +21,8 @@ export const date = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' 
 export function duration(ms) {
   if (ms == null) return '—'
   const s = Math.round(ms / 1000)
+  // (without seconds in the export, an answer within the minute reads as 0)
+  if (s < 1) return '< 1 menit'
   if (s < 60) return `${s} detik`
   const m = Math.round(s / 60)
   if (m < 60) return `${m} menit`

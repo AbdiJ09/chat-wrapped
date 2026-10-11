@@ -8,6 +8,11 @@
 // …plus 4-digit years, dashes or dots in dates, invisible direction marks (U+200E/U+200F) and
 // narrow no-break spaces before AM/PM. A message can run over many lines; only its first line
 // has a timestamp. Lines without "Name: " are system notices (encryption, group changes).
+//
+// A message can also hold what looks like another one: copy a few messages in WhatsApp and paste
+// them, and they come out as "[10/10/24 21.30] Dinda: halo". Those aren't the chat's: they're
+// written differently from the export's own lines (brackets on Android, no seconds on iPhone) or
+// they go back in time, so they stay part of the message they were pasted into.
 
 // iPhone: "[date time] rest"; Android: "date time - rest" (strict, so a message that merely starts
 // with a date doesn't get mistaken for a new one)
@@ -34,24 +39,30 @@ const clean = (s) => s.replace(/[\u200e\u200f\u202a-\u202e\ufeff]/g, '')
 export function parseWhatsApp(text) {
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
 
-  // pass 1: find the timestamped lines and decide day/month order from the numbers themselves
-  const heads = []
-  let firstMax = 0
-  let secondMax = 0
-  let ampm = false
+  // pass 1: find the timestamped lines, keep the ones written the way most of them are, and decide
+  // day/month order from the numbers themselves
+  let heads = []
+  const looks = new Map()
   for (let i = 0; i < lines.length; i++) {
     const m = HEAD.exec(lines[i])
     if (!m || !m[1] !== !m[9].startsWith(']')) continue
-    const a = +m[2]
-    const b = +m[3]
-    if (m[2].length < 4) {
-      firstMax = Math.max(firstMax, a)
-      secondMax = Math.max(secondMax, b)
-    }
-    if (m[8]) ampm = true
-    heads.push({ i, m })
+    const look = `${!!m[1]} ${m[7] != null} ${!!m[8]}`
+    looks.set(look, (looks.get(look) ?? 0) + 1)
+    heads.push({ i, m, look })
   }
   if (!heads.length) throw new ChatFormatError()
+  const usual = [...looks].sort((a, b) => b[1] - a[1])[0][0]
+  heads = heads.filter((h) => h.look === usual)
+  let firstMax = 0
+  let secondMax = 0
+  let ampm = false
+  for (const { m } of heads) {
+    if (m[2].length < 4) {
+      firstMax = Math.max(firstMax, +m[2])
+      secondMax = Math.max(secondMax, +m[3])
+    }
+    if (m[8]) ampm = true
+  }
 
   // dd/mm unless the numbers prove otherwise; US-style AM/PM exports lean mm/dd
   let order = 'dmy'
@@ -60,15 +71,7 @@ export function parseWhatsApp(text) {
   else if (secondMax > 12) order = 'mdy'
   else if (ampm) order = 'mdy'
 
-  const messages = []
-  const people = new Map()
-  let last = null
-  let cursor = 0
-  for (const { i, m } of heads) {
-    // lines between the previous header and this one belong to the previous message
-    if (last && i > cursor + 1) last.text += '\n' + lines.slice(cursor + 1, i).join('\n')
-    cursor = i
-
+  const time = (m) => {
     let [y, mo, d] = order === 'ymd' ? [+m[2], +m[3], +m[4]] : order === 'dmy' ? [+m[4], +m[3], +m[2]] : [+m[4], +m[2], +m[3]]
     if (y < 100) y += 2000
     let h = +m[5]
@@ -77,7 +80,29 @@ export function parseWhatsApp(text) {
       if (h === 12) h = pm ? 12 : 0
       else if (pm) h += 12
     }
-    const t = new Date(y, mo - 1, d, h, +m[6], +(m[7] ?? 0)).getTime()
+    return new Date(y, mo - 1, d, h, +m[6], +(m[7] ?? 0)).getTime()
+  }
+  for (const h of heads) h.t = time(h.m)
+
+  // the export runs forward in time: a line dated well before the ones above it was pasted in.
+  // (Unless that happens a lot: then it's more likely we got the day/month order wrong.)
+  let latest = -Infinity
+  const back = heads.filter((h) => {
+    const early = h.t < latest - 2 * 60000
+    latest = Math.max(latest, h.t)
+    return early
+  })
+  if (back.length <= Math.max(3, heads.length / 100)) heads = heads.filter((h) => !back.includes(h))
+
+  const messages = []
+  const people = new Map()
+  let last = null
+  let cursor = 0
+  for (const { i, m, t } of heads) {
+    // lines between the previous header and this one belong to the previous message
+    if (last && i > cursor + 1) last.text += '\n' + lines.slice(cursor + 1, i).join('\n')
+    cursor = i
+
     const rest = m[10]
     const colon = rest.indexOf(': ')
     if (colon <= 0 || colon > 80) {

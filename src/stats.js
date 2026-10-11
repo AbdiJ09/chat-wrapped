@@ -137,6 +137,8 @@ export function computeStats({ messages, people }, { title = null } = {}) {
       starts: p.starts,
       startShare: conversations ? p.starts / conversations : 0,
       replyMedian: median(p.replies),
+      // (most exports only keep the minute, so medians often tie at 0: the mean tells them apart)
+      replyMean: p.replies.length ? p.replies.reduce((x, y) => x + y, 0) / p.replies.length : null,
       laughs: p.laughs,
       night: p.night,
       longest: p.longest,

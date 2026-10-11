@@ -71,3 +71,26 @@ test('edited and attached media', () => {
 test('not a chat', () => {
   assert.throws(() => parseWhatsApp('hello world\nthis is a note'), ChatFormatError)
 })
+
+test('messages pasted into a message stay part of it', () => {
+  // copied in WhatsApp and pasted: written differently from the export's own lines
+  const android = parseWhatsApp([
+    '10/10/24 21.30 - Hari: liat deh',
+    '[09/10/24 20.11] Dinda: ini portopolionya',
+    '[09/10/24 20.12] Dinda: tolong ya',
+    '10/10/24 21.31 - Uraaatu: oke',
+    '10/10/24 21.32 - Hari: makasih',
+  ].join('\n'))
+  assert.deepEqual(android.people, ['Hari', 'Uraaatu'])
+  assert.equal(android.messages.length, 3)
+  assert.match(android.messages[0].text, /Dinda: tolong ya$/)
+  // pasted from another export, the same way of writing, but from before
+  const ios = parseWhatsApp([
+    '[10/10/24 21.30.05] Hari: liat deh',
+    '[09/10/24 20.11.40] Dinda: ini portopolionya',
+    '[10/10/24 21.31.10] Uraaatu: oke',
+    '[10/10/24 21.32.00] Hari: makasih',
+  ].join('\n'))
+  assert.deepEqual(ios.people, ['Hari', 'Uraaatu'])
+  assert.equal(ios.messages.length, 3)
+})
