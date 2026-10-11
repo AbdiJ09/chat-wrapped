@@ -1,0 +1,98 @@
+<!doctype html>
+<!--
+  The link preview (WhatsApp, X, iMessage…): 1200 × 630, the bubbles in the studio with the
+  headline beside them. Not part of the site: render it with the dev server running, e.g.
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --use-angle=swiftshader \
+      --enable-unsafe-swiftshader --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 \
+      --virtual-time-budget=15000 --screenshot=og.png "http://localhost:5200/tools/og.html"
+  then: sips -s format jpeg -s formatOptions 88 og.png --out public/og.jpg  (WhatsApp skips big images: keep it ~150 KB)
+  (?shape=badge|heart|helix &theme=bestie|couple|… &ox= how far right the sculpture sits &zoom= < 1 closer)
+-->
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>og</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500&family=Geist+Mono:wght@500&display=block" rel="stylesheet" />
+    <style>
+      html, body { margin: 0; background: #05080f; overflow: hidden; }
+      canvas { display: block; width: 1200px; height: 630px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="og" width="1200" height="630"></canvas>
+    <script type="module">
+      import { Engine } from '/src/three/engine.js'
+      import * as shapes from '/src/three/shapes.js'
+      import { makeStory } from '/src/story/slides.js'
+      import { parseWhatsApp } from '/src/parse/whatsapp.js'
+      import { computeStats } from '/src/stats.js'
+      import { demoMessages, formatExport } from '/src/demo.js'
+      import { THEMES } from '/src/theme.js'
+
+      const q = new URLSearchParams(location.search)
+      const theme = THEMES[q.get('theme') ?? 'bestie']
+      const form = q.get('shape') ?? 'badge'
+      const ox = +(q.get('ox') ?? 0.21)
+      const N = 1800
+      const S = computeStats(parseWhatsApp(formatExport(demoMessages(), 'android-id')))
+
+      // the cover slide gives the studio its light and backdrop; the sculpture is ours to pick
+      const [slide] = makeStory(S, N, theme, null, { only: 'cover' })
+      shapes.usePalette(theme)
+      const A = shapes.authors(S, N)
+      slide.shape = form === 'badge' ? shapes.badge(N, A) : form === 'heart' ? shapes.heart(N, A) : shapes.helix(N, A, 2)
+      slide.cam = form === 'badge' ? { pos: [-2.2, 2.3, 9.6], look: [0, 1.45, 0], orbit: 0, speed: 0 } : { pos: [0, 2.2, 11], look: [0, 1.3, 0], orbit: 0, speed: 0 }
+
+      const engine = new Engine({ count: N, quality: 1 })
+      engine.resize(1200, 630, 1)
+      engine.offset = [ox, 0]
+      engine.zoom = +(q.get('zoom') ?? 0.84)
+      engine.setStory([slide], slide)
+      for (let k = 0; k < 4; k++) engine.render(0, 8)
+
+      await document.fonts.load('800 80px "Bricolage Grotesque"')
+      await document.fonts.load('400 24px Geist')
+      await document.fonts.load('500 16px "Geist Mono"')
+      const ctx = document.getElementById('og').getContext('2d')
+      ctx.drawImage(engine.canvas, 0, 0, 1200, 630)
+
+      // the words' side, darkened a little so they read
+      const g = ctx.createLinearGradient(0, 0, 760, 0)
+      g.addColorStop(0, 'rgba(5,8,15,0.82)')
+      g.addColorStop(0.6, 'rgba(5,8,15,0.45)')
+      g.addColorStop(1, 'rgba(5,8,15,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, 1200, 630)
+
+      const X = 72
+      const ink = '#f2f6ff'
+      const accent = theme.accent
+      ctx.textBaseline = 'alphabetic'
+      // the logo
+      ctx.font = '500 30px "Bricolage Grotesque"'
+      ctx.fillStyle = ink
+      ctx.fillText('chat', X, 96)
+      const w = ctx.measureText('chat').width
+      ctx.font = '800 30px "Bricolage Grotesque"'
+      ctx.fillStyle = accent
+      ctx.fillText('wrapped', X + w, 96)
+      // the headline
+      ctx.letterSpacing = '-3.5px'
+      ctx.font = '800 92px "Bricolage Grotesque"'
+      ctx.fillStyle = ink
+      ctx.fillText('Chat kalian,', X - 4, 300)
+      ctx.fillStyle = accent
+      ctx.fillText('jadi rekap.', X - 4, 392)
+      ctx.letterSpacing = '0px'
+      ctx.font = '400 26px Geist'
+      ctx.fillStyle = 'rgba(242,246,255,0.72)'
+      ctx.fillText('Export chat WhatsApp → rekap siap story.', X, 466)
+      ctx.fillText('Diproses di HP-mu, nggak pernah di-upload.', X, 504)
+      ctx.letterSpacing = '3px'
+      ctx.font = '500 16px "Geist Mono"'
+      ctx.fillStyle = 'rgba(242,246,255,0.5)'
+      ctx.fillText('CHAT-WRAPPED-ONE.VERCEL.APP', X, 570)
+      document.title = 'done'
+    </script>
+  </body>
+</html>
