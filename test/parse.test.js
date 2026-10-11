@@ -66,6 +66,17 @@ test('edited and attached media', () => {
   assert.equal(messages[0].text, 'halo')
   assert.equal(messages[0].edited, true)
   assert.equal(messages[1].kind, 'media')
+  assert.equal(messages[1].media, '00000012-PHOTO-2024-10-12-21-31-00.jpg')
+})
+
+test('a caption stays text, without the file name', () => {
+  const ios = parseWhatsApp('[9/15/26, 9:06:00\u202fAM] A: liat ini \u200e<attached: 00000047-PHOTO-2026-09-15-09-06-00.jpg>\n[9/15/26, 9:07:00\u202fAM] B: wkwk\n')
+  assert.equal(ios.messages[0].kind, 'text')
+  assert.equal(ios.messages[0].text, 'liat ini')
+  assert.equal(ios.messages[0].media, '00000047-PHOTO-2026-09-15-09-06-00.jpg')
+  const android = parseWhatsApp('15/09/26 09.06 - A: IMG-20260915-WA0001.jpg (file terlampir)\nliat ini\n15/09/26 09.07 - B: wkwk\n')
+  assert.equal(android.messages[0].text, 'liat ini')
+  assert.equal(android.messages[0].media, 'IMG-20260915-WA0001.jpg')
 })
 
 test('not a chat', () => {

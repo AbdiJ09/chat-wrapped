@@ -1,4 +1,5 @@
-import { unzipSync, zipSync } from 'fflate'
+import { zipSync } from 'fflate'
+import { openZip } from './parse/zip.js'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
@@ -962,15 +963,19 @@ function titleFrom(filename) {
 }
 
 async function readChat(file) {
-  const buf = new Uint8Array(await file.arrayBuffer())
-  // a .zip (with or without media): the chat is the biggest .txt inside
-  if (buf[0] === 0x50 && buf[1] === 0x4b) {
-    const files = unzipSync(buf, { filter: (f) => /\.txt$/i.test(f.name) && !f.name.startsWith('__MACOSX') })
-    const best = Object.entries(files).sort((a, b) => b[1].length - a[1].length)[0]
+  const magic = new Uint8Array(await file.slice(0, 2).arrayBuffer())
+  // a .zip (with or without media, maybe GBs): only the chat itself — the biggest .txt — is read
+  if (magic[0] === 0x50 && magic[1] === 0x4b) {
+    const zip = await openZip(file).catch(() => {
+      throw new ChatFormatError()
+    })
+    const best = zip.entries
+      .filter((e) => /\.txt$/i.test(e.name) && !e.name.startsWith('__MACOSX'))
+      .sort((a, b) => b.size - a.size)[0]
     if (!best) throw new ChatFormatError()
-    return new TextDecoder().decode(best[1])
+    return new TextDecoder().decode(await zip.read(best))
   }
-  return new TextDecoder().decode(buf)
+  return new TextDecoder().decode(await file.arrayBuffer())
 }
 
 let chat = null // { stats, theme }

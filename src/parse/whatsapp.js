@@ -22,9 +22,10 @@ const HEAD = /^[\u200e\u200f\u202a-\u202e\ufeff]*(\[)?(\d{1,4})[/.\-](\d{1,2})[/
 const MEDIA = [
   /^<?(media omitted|media tidak disertakan|media tidak dilampirkan)>?$/i,
   /^(image|video|audio|sticker|gif|document|contact card|gambar|foto|stiker|dokumen|kartu kontak)\s+(omitted|tidak disertakan|dihilangkan)$/i,
-  /^<(attached|lampiran|terlampir):\s*.+>$/i,
-  /^\S+\.(jpe?g|png|webp|gif|mp4|mov|opus|ogg|m4a|mp3|pdf|vcf|webm)\s*\((file attached|file terlampir)\)$/i,
 ]
+// an export "with media" names the file instead; a caption, if any, comes before it (iPhone) or on the next lines (Android)
+const ATTACHED_IOS = /\s*<(?:attached|lampiran|terlampir):\s*([^>]+)>\s*$/i
+const ATTACHED_ANDROID = /^(\S+\.[a-z0-9]{2,5})\s*\((?:file attached|file terlampir)\)\s*/i
 const DELETED = /^(this message was deleted|you deleted this message|pesan ini (telah )?dihapus|anda menghapus pesan ini|kamu menghapus pesan ini)\.?$/i
 const EDITED = /\s*<(this message was edited|pesan ini (telah )?diedit)>\s*$/i
 const SYSTEM_HINTS = /end-to-end|terenkripsi|enkripsi end|security code|kode keamanan|created group|membuat grup|added|menambahkan|left$|keluar$|changed the subject|mengubah subjek|changed this group|mengubah ikon|joined using|bergabung menggunakan|missed (voice|video) call|panggilan (suara|video) tak terjawab|disappearing messages|pesan sementara|is a contact|adalah kontak/i
@@ -34,7 +35,8 @@ const clean = (s) => s.replace(/[\u200e\u200f\u202a-\u202e\ufeff]/g, '')
 /**
  * @param {string} text the whole export
  * @returns {{ messages: Message[], people: string[], format: object }}
- * Message: { t: ms since epoch (local time), author, text, kind: 'text'|'media'|'deleted', edited }
+ * Message: { t: ms since epoch (local time), author, text, kind: 'text'|'media'|'deleted', edited, media? }
+ * (media: the attached file's name in an export with media; a captioned one stays kind 'text' with the caption)
  */
 export function parseWhatsApp(text) {
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
@@ -112,7 +114,7 @@ export function parseWhatsApp(text) {
     const author = clean(rest.slice(0, colon)).trim()
     const body = rest.slice(colon + 2)
     // iPhone writes system notices as if the chat itself said them, marked with U+200E
-    if (/^[\u200e\u200f]/.test(body) && SYSTEM_HINTS.test(body) && !MEDIA.some((r) => r.test(clean(body).trim()))) {
+    if (/^[\u200e\u200f]/.test(body) && SYSTEM_HINTS.test(body) && !ATTACHED_IOS.test(body) && !MEDIA.some((r) => r.test(clean(body).trim()))) {
       last = null
       continue
     }
@@ -127,7 +129,12 @@ export function parseWhatsApp(text) {
       msg.edited = true
       body = body.replace(EDITED, '')
     }
-    if (MEDIA.some((r) => r.test(body))) msg.kind = 'media'
+    const file = body.match(ATTACHED_IOS) ?? body.match(ATTACHED_ANDROID)
+    if (file) {
+      msg.media = file[1].trim()
+      body = body.replace(file[0], ' ').trim()
+    }
+    if (file ? !body : MEDIA.some((r) => r.test(body))) msg.kind = 'media'
     else if (DELETED.test(body)) msg.kind = 'deleted'
     msg.text = msg.kind === 'text' ? body : ''
     people.set(msg.author, (people.get(msg.author) ?? 0) + 1)
