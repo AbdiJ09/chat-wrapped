@@ -96,5 +96,13 @@ export async function openZip(blob) {
     throw new ZipError(`unsupported compression ${entry.method}`)
   }
 
-  return { entries, read }
+  // just a part of a file — without reading the rest when it's stored as is (media always is)
+  async function slice(entry, from, to) {
+    if (entry.method !== 0) return (await read(entry)).subarray(from, to)
+    const head = await bytes(blob, entry.offset, entry.offset + 30)
+    const at = entry.offset + 30 + head.getUint16(26, true) + head.getUint16(28, true)
+    return new Uint8Array(await blob.slice(at + from, at + Math.min(to, entry.csize)).arrayBuffer())
+  }
+
+  return { entries, read, slice }
 }

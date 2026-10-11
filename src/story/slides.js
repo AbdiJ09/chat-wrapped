@@ -460,6 +460,90 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     })
   }
 
+  // — premium, from an export with media: the favourite sticker, and the voice notes —
+  const MD = premium && S.media
+  const st = MD?.stickers.top
+  if (st?.img && st.n >= 3) {
+    const rows = P.map((p, i) => ({ p, i, m: MD.people[i] }))
+      .filter((r) => r.m?.top?.img)
+      .sort((a, b) => b.m.sticker - a.m.sticker)
+      .slice(0, S.group ? 3 : 2)
+    const most = rows[0]
+    add({
+      id: 'stickers',
+      label: 'Stiker andalan',
+      duration: 7,
+      shape: () => shapes.sticker(N, A, st.img),
+      cam: { pos: [0, 1.9, 8], look: [0, 1.2, 0], orbit: 0.3, speed: 0.3 },
+      words(ctx, t) {
+        shade(ctx)
+        eyebrow(ctx, 'Stiker andalan', 250, MUTED, at(t, late))
+        text(ctx, `${num(st.n)} kali dikirim.`, M, 330, head(46, { color: FG, alpha: at(t, late + 0.3) }))
+        text(ctx, `Dari ${num(MD.total.sticker)} stiker, ${num(MD.stickers.unique)} yang beda.`, M, 390, { size: 32, color: MUTED, alpha: at(t, late + 0.5) })
+        if (most) text(ctx, `${first(most.p.name)} paling rajin nyetiker.`, M, 1390, { size: 38, weight: 500, color: colorOf(most.i), alpha: at(t, late + 0.7) })
+        rows.forEach(({ p, i, m }, row) => {
+          const y = 1480 + row * (S.group ? 124 : 140)
+          const a = at(t, late + 0.9 + row * 0.2)
+          const size = 112
+          text(ctx, first(p.name), M, y, { size: 36, weight: 500, color: colorOf(i), alpha: a })
+          text(ctx, `${num(m.sticker)} stiker`, M, y + 48, { size: 28, color: MUTED, alpha: a })
+          text(ctx, `${num(m.top.n)}×`, W - M - size - 24, y + 22, head(52, { color: FG, align: 'right', alpha: a }))
+          ctx.save()
+          ctx.globalAlpha = a
+          ctx.drawImage(m.top.img, W - M - size, y - size * 0.62, size, size)
+          ctx.restore()
+        })
+      },
+    })
+  }
+  if (MD && MD.total.audio >= 3 && MD.total.voice >= 60) {
+    const rows = P.map((p, i) => ({ p, i, m: MD.people[i] }))
+      .filter((r) => r.m?.audio)
+      .sort((a, b) => b.m.voice - a.m.voice)
+      .slice(0, S.group ? 3 : 2)
+    const [a0, a1] = rows
+    const gap = a1 ? a0.m.voice - a1.m.voice : 0
+    // who'd rather say it out loud: a verdict, unless it's a tie
+    const verdict = !S.group && a1 && gap < Math.min(60, a0.m.voice * 0.1)
+      ? gap < 1 ? 'Seimbang. Persis sama panjangnya.' : `Seimbang. Selisihnya cuma ${num(gap)} detik.`
+      : `${first(a0.p.name)} lebih suka ngomong langsung.`
+    const long = MD.longest
+    const total = duration(MD.total.voice * 1000)
+    // to the second, under an hour (so a verdict between "5 menit" and "5 menit" still shows why)
+    const exact = (sec) => {
+      const s = Math.round(sec)
+      if (s >= 3600) return duration(s * 1000)
+      if (s < 60) return `${s} detik`
+      return s % 60 ? `${Math.floor(s / 60)} menit ${s % 60} detik` : `${s / 60} menit`
+    }
+    add({
+      id: 'voice',
+      label: 'Voice note',
+      duration: 7,
+      shape: () => shapes.towers(N, A, P.slice(0, 6).map((_, i) => MD.people[i]?.voice ?? 0)),
+      cam: { pos: [0, 2.1, 8.4], look: [0, 1.0, 0], orbit: 0.3, speed: 0.2 },
+      words(ctx, t) {
+        shade(ctx)
+        eyebrow(ctx, 'Voice note', 250, MUTED, at(t, late))
+        const o = big(170, { color: FG, alpha: at(t, late + 0.2), rise: 50 })
+        const w = measure(ctx, total, o)
+        if (w > W - 2 * M) o.size = Math.floor((170 * (W - 2 * M)) / w)
+        text(ctx, total, M, 440, o)
+        text(ctx, `ngobrol lewat ${num(MD.total.audio)} voice note.`, M, 510, { size: 34, color: MUTED, alpha: at(t, late + 0.4) })
+        text(ctx, verdict, M, 1390, { size: 38, weight: 500, color: colorOf(a0.i), alpha: at(t, late + 0.7) })
+        rows.forEach(({ p, i, m }, row) => {
+          const y = 1490 + row * 92
+          const a = at(t, late + 0.9 + row * 0.15)
+          text(ctx, first(p.name), M, y, { size: 40, weight: 500, color: colorOf(i), alpha: a })
+          text(ctx, exact(m.voice), W - M, y, head(52, { color: FG, align: 'right', alpha: a }))
+        })
+        if (long && long.sec >= 60) {
+          text(ctx, `Paling panjang: ${exact(long.sec)}, dari ${first(P[long.i].name)}.`, M, 1490 + rows.length * 92 + 20, { size: 30, color: MUTED, alpha: at(t, late + 1.5) })
+        }
+      },
+    })
+  }
+
   // — premium: the scenes you made yourself (our layouts, your chat) —
   for (const sc of premium?.scenes ?? []) {
     const m = sceneMessage(sc)

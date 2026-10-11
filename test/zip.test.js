@@ -20,3 +20,13 @@ test('reads only the entries asked for, stored or deflated', async () => {
 test('not a zip', async () => {
   await assert.rejects(openZip(new Blob(['hello'])))
 })
+
+test('a part of a stored file, without reading the rest', async () => {
+  const data = new Uint8Array(1000).map((_, i) => i % 256)
+  const zip = zipSync({ 'a.opus': [data, { level: 0 }], 'b.txt': strToU8('y'.repeat(3000)) })
+  const { entries, slice } = await openZip(new Blob([zip]))
+  const a = entries.find((e) => e.name === 'a.opus')
+  assert.deepEqual([...(await slice(a, 990, 1000))], [...data.subarray(990)])
+  const b = entries.find((e) => e.name === 'b.txt')
+  assert.equal(new TextDecoder().decode(await slice(b, 0, 3)), 'yyy')
+})

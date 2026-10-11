@@ -395,17 +395,27 @@ export function terrain(N, A, calendar, busiest, seed = 9) {
 
 // — the favourite emoji, as a mosaic of bubbles —
 export function emoji(N, A, char, seed = 10) {
-  const r = rng(seed)
-  const s = make(N)
   const SIZE = 400
-  const ink = inked((g) => {
+  return mosaic(N, A, inked((g) => {
     g.font = `${SIZE * 0.82}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillText(char, SIZE / 2, SIZE / 2 + SIZE * 0.04)
-  }, SIZE, SIZE)
-  const width = 2.3
-  const scale = width / Math.max(1, ink.x1 - ink.x0)
+  }, SIZE, SIZE), seed)
+}
+
+// — premium: the favourite sticker, the same way (img: a square canvas, see media.js) —
+// (a little smaller than the emoji, and its whites kept from glowing: stickers are mostly white)
+export function sticker(N, A, img, seed = 20) {
+  return mosaic(N, A, inked((g, w, h) => g.drawImage(img, 0, 0, w, h), 400, 400), seed, { width: 2.0, height: 2.0, light: 0.42 })
+}
+
+// a picture's inked pixels as a domed wall of bubbles standing on the floor
+// (width, unless that makes a tall picture taller than height; light: the most a colour may shine)
+function mosaic(N, A, ink, seed, { width = 2.3, height = 2.5, light = Infinity } = {}) {
+  const r = rng(seed)
+  const s = make(N)
+  const scale = Math.min(width / Math.max(1, ink.x1 - ink.x0), height / Math.max(1, ink.y1 - ink.y0))
   const lin = (v) => Math.pow(v, 2.2)
   const { list, c } = lattice((c) => {
     const out = []
@@ -426,7 +436,10 @@ export function emoji(N, A, char, seed = 10) {
     const [x, y, px] = list[k]
     // a dome, so it has a body
     const dome = Math.sqrt(Math.max(0, 1 - (x * x + (y - 1.15) ** 2) / 1.4)) * 0.35
-    put(s, k, x, 0.45 + y, dome + gauss(r) * 0.02, [lin(px[0]), lin(px[1]), lin(px[2])], { ry: gauss(r) * 0.15, rx: gauss(r) * 0.15, size: c * 1.3, bright: 1.1 })
+    let col = [lin(px[0]), lin(px[1]), lin(px[2])]
+    const lum = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2]
+    if (lum > light) col = col.map((v) => (v * light) / lum)
+    put(s, k, x, 0.45 + y, dome + gauss(r) * 0.02, col, { ry: gauss(r) * 0.15, rx: gauss(r) * 0.15, size: c * 1.3, bright: 1.1 })
   }
   return s
 }

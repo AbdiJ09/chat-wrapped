@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate'
 import { openZip } from './parse/zip.js'
+import { readMedia } from './media.js'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
@@ -490,7 +491,9 @@ function showWho() {
 function studioCTA() {
   if (!gift) {
     $('studio-cta-title').textContent = 'Custom rekap kalian'
-    $('studio-cta-sub').textContent = 'foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri'
+    $('studio-cta-sub').textContent = chat?.stats.media
+      ? 'stiker andalan & voice note kalian, foto dari ribuan pesan, judul, nama panggilan'
+      : 'foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri'
     return
   }
   const done = [
@@ -884,6 +887,7 @@ $('maker-list').addEventListener('click', (e) => {
 // follow. Out: the phone sinks away and the picker builds itself back in.
 async function enterStudio() {
   if (!chat?.messages) return
+  await chat.media
   gift ??= newGift()
   view = 'studio'
   const move = ++moves
@@ -973,9 +977,9 @@ async function readChat(file) {
       .filter((e) => /\.txt$/i.test(e.name) && !e.name.startsWith('__MACOSX'))
       .sort((a, b) => b.size - a.size)[0]
     if (!best) throw new ChatFormatError()
-    return new TextDecoder().decode(await zip.read(best))
+    return { text: new TextDecoder().decode(await zip.read(best)), zip }
   }
-  return new TextDecoder().decode(await file.arrayBuffer())
+  return { text: new TextDecoder().decode(await file.arrayBuffer()), zip: null }
 }
 
 let chat = null // { stats, theme }
@@ -1030,12 +1034,13 @@ function tween(a, b, ms, fn, curve = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x 
  *   title    your names, letter by letter, like a film's title card
  *   land     the title flies up into the picker's corner; the picker builds in round it
  */
-async function showPicker({ stats, guess, messages }) {
+async function showPicker({ stats, guess, messages, media = null }) {
   view = 'picker'
   const move = ++moves
   const theme = THEMES[guess]
-  // (the messages themselves are kept only for making your own scenes)
-  chat = { stats, theme, messages }
+  // (the messages themselves are kept only for making your own scenes; media: the stickers and
+  // voice notes of an export with media, still being read)
+  chat = { stats, theme, messages, media }
   const e = stage.engine
   const gone = () => move !== moves
   // send
@@ -1132,7 +1137,18 @@ async function handle(file) {
   if (!file) return
   composerSay(`Membaca ${file.name}…`, 'busy')
   try {
-    await showPicker(analyse(await readChat(file), titleFrom(file.name)))
+    const { text, zip } = await readChat(file)
+    const a = analyse(text, titleFrom(file.name))
+    // an export with media: its stickers and voice notes are read while the picker builds
+    if (zip) {
+      a.media = readMedia(zip, a.messages, a.stats.people.map((p) => p.name))
+        .then((m) => {
+          a.stats.media = m
+          if (chat?.stats === a.stats) studioCTA()
+        })
+        .catch((err) => console.error(err))
+    }
+    await showPicker(a)
   } catch (err) {
     console.error(err)
     composerSay(err instanceof ChatFormatError ? 'Itu bukan export chat WhatsApp. Pakai .txt / .zip hasil "Ekspor chat".' : err.message, 'error')
@@ -1158,6 +1174,7 @@ async function play() {
   view = 'story'
   moves++
   await fontsReady
+  await chat.media
   const { stats, theme, premium } = film()
   // the preview fades; the film starts the song from the top of its part
   song?.track.stop(0.9)
