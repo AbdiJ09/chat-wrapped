@@ -40,6 +40,8 @@ const fontsReady = Promise.all([
   document.fonts.load('400 40px "Geist"'),
   document.fonts.load('500 40px "Geist"'),
   document.fonts.load('500 40px "Geist Mono"'),
+  document.fonts.load('400 60px "Instrument Serif"'),
+  document.fonts.load('italic 400 60px "Instrument Serif"'),
 ]).catch(() => {})
 
 // — the page's colours follow the theme too —
@@ -329,9 +331,9 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 // those change
 let lengthOf = null
 function filmLength() {
-  const { stats, theme, premium } = film()
-  const key = premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : ''
-  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium, { sculpt: false }).reduce((a, s) => a + s.duration, 0) }
+  const { stats, theme, premium, style } = film()
+  const key = style + (premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : '')
+  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium, { sculpt: false, style }).reduce((a, s) => a + s.duration, 0) }
   return lengthOf.s
 }
 
@@ -415,11 +417,6 @@ $('song-drop').addEventListener('click', () => {
   song = null
   $('song-hint').textContent = HINT
   songUI()
-  gift = null
-  studioCTA()
-  studio.hidden = true
-  document.body.classList.remove('is-studio')
-  pv = null
   composerPlay()
 })
 // slide the lit part along (it snaps to a beat when you let go); a tap without sliding: play/pause
@@ -470,6 +467,29 @@ function songFrame() {
   if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
 }
 
+// — recap or film: how the story is told —
+const STYLE_HINTS = { recap: 'angka-angka besar, cepat, kayak year in review', film: 'bab demi bab, narasi kayak subtitle, credits di akhir' }
+function styleUI() {
+  const style = chat?.style ?? 'recap'
+  const sw = $('style-pick')
+  for (const b of sw.querySelectorAll('button')) b.setAttribute('aria-checked', b.dataset.style === style)
+  const on = sw.querySelector(`[data-style="${style}"]`)
+  sw.style.setProperty('--w', `${on.offsetWidth}px`)
+  sw.style.setProperty('--x', `${on.offsetLeft - 3}px`)
+  const hint = $('style-hint')
+  if (hint.textContent !== STYLE_HINTS[style]) {
+    hint.textContent = STYLE_HINTS[style]
+    restart(hint, 'is-new')
+  }
+}
+$('style-pick').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]')
+  if (!b || !chat || b.dataset.style === chat.style) return
+  chat.style = b.dataset.style
+  styleUI()
+  if (song) drawWave()
+})
+
 // — premium: the studio —
 // No payment yet: it simply turns on. Out of the picker, into a page of its own: the film itself,
 // live, in a phone in the middle (each change shows at once: a new sculpture flies in, a new
@@ -484,7 +504,7 @@ function film() {
   const theme = recolor(chat.theme, gift?.colors)
   const stats = gift ? rename(chat.stats, gift.names) : chat.stats
   const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names) }
-  return { stats, theme, premium }
+  return { stats, theme, premium, style: chat.style ?? 'recap' }
 }
 // the picker's name line follows the title and the nicknames; its studio button, what you've done
 function showWho() {
@@ -530,8 +550,9 @@ function viewOf(i) {
   if (i === 0) return 'cover'
   if (i === 1) return chat.stats.group ? 'awards' : 'share'
   if (i === 2) return 'ending'
-  if (i === 3) return draft?.data ? 'draft' : gift.scenes.at(-1)?.id ?? 'summary'
-  return viewing ?? 'summary'
+  const last = chat.style === 'film' ? 'credits' : 'summary'
+  if (i === 3) return draft?.data ? 'draft' : gift.scenes.at(-1)?.id ?? last
+  return viewing ?? last
 }
 /**
  * Show slide id in the phone. how: 'fly' (a new sculpture: the bubbles fly there), 'wave' (the same
@@ -539,9 +560,9 @@ function viewOf(i) {
  */
 function preview(id, how = 'fly') {
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
-  const { stats, theme, premium } = film()
+  const { stats, theme, premium, style } = film()
   const scenes = draft?.data ? [...premium.scenes, { ...draft.data, object: draft.object, title: draft.title, id: 'draft' }] : premium.scenes
-  const make = (only) => makeStory(stats, N, theme, { ...premium, hidden: new Set(), scenes }, { only })
+  const make = (only) => makeStory(stats, N, theme, { ...premium, hidden: new Set(), scenes }, { only, style })
   let slides = make(id)
   if (!slides.length) slides = make((id = 'cover'))
   const now = performance.now()
@@ -731,8 +752,8 @@ $('gift-file').addEventListener('change', async () => {
 
 // 5. which scenes: tap one to see it, tap it again to switch it off (or on)
 function fillScenes() {
-  const { stats, theme, premium } = film()
-  const slides = makeStory(stats, 300, theme, { ...premium, hidden: new Set() }, { sculpt: false })
+  const { stats, theme, premium, style } = film()
+  const slides = makeStory(stats, 300, theme, { ...premium, hidden: new Set() }, { sculpt: false, style })
   $('custom-scenes').innerHTML = slides
     .map((sl) => `<button type="button" class="custom__scene${sl.id === viewing ? ' is-viewing' : ''}" data-id="${sl.id}" aria-pressed="${!gift.hidden.has(sl.id)}">${esc(sl.label)}</button>`)
     .join('')
@@ -1122,6 +1143,7 @@ async function showPicker({ stats, guess, messages }) {
   if (song) songUI()
   showWho()
   studioCTA()
+  styleUI()
   if (gift?.photo) {
     stage.setPhoto(gift.photo)
     stage.show('portrait', { force: true })
@@ -1157,7 +1179,7 @@ async function play() {
   view = 'story'
   moves++
   await fontsReady
-  const { stats, theme, premium } = film()
+  const { stats, theme, premium, style } = film()
   // the preview fades; the film starts the song from the top of its part
   song?.track.stop(0.9)
   audio?.resume()
@@ -1169,9 +1191,9 @@ async function play() {
   $('flash').classList.remove('is-soft')
   restart($('flash'), 'is-on')
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
-  const slides = makeStory(stats, N, theme, premium)
+  const slides = makeStory(stats, N, theme, premium, { style })
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
-  story = { engine, slides, premium, stats, theme }
+  story = { engine, slides, premium, stats, theme, film: style === 'film' }
   picker.hidden = true
   landing.hidden = true
   storyView.hidden = false
@@ -1179,7 +1201,8 @@ async function play() {
   stageOn = false
   fitEngine()
   player?.destroy()
-  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, music: song && { track: song.track, start: song.start } })
+  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, film: style === 'film', music: song && { track: song.track, start: song.start } })
+  $('film-pause').hidden = true
   $('save-video').hidden = !canMakeVideo()
   $('save-poster').hidden = !premium
   // the video is silent: on Instagram, the song goes on from where it starts here
@@ -1270,6 +1293,12 @@ frame.addEventListener('pointerup', (e) => {
   if (!player) return
   player.held = false
   if (held) return // that was a pause, not a tap
+  // a film isn't skipped through: a tap pauses it (or plays it again)
+  if (player.film) {
+    player.playing = !player.playing
+    $('film-pause').hidden = player.playing
+    return
+  }
   const r = frame.getBoundingClientRect()
   if (e.clientX - r.left < r.width * 0.3) player.prev()
   else player.next()
@@ -1287,6 +1316,7 @@ addEventListener('keydown', (e) => {
   if (e.key === ' ') {
     e.preventDefault()
     player.playing = !player.playing
+    if (player.film) $('film-pause').hidden = player.playing
   }
   if (e.key === 'Escape') sheet.classList.contains('is-open') ? openSheet(false) : back()
 })

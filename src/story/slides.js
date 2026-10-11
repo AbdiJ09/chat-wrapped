@@ -1,6 +1,7 @@
 import { W, H, M, DISPLAY, MONO, at, clamp, easeInOut, num, date, duration, text, wrap, eyebrow, measure, drawGrain } from './draw.js'
 import * as shapes from '../three/shapes.js'
 import { KINDS, CAMS, sceneShape, sceneMessage } from './scenes.js'
+import { toFilm } from './film.js'
 
 // The story: each slide is a sculpture for the bubbles (with a camera and a backdrop) plus a
 // layer of words on top. The middle of the frame belongs to the 3D; words live above and below.
@@ -39,6 +40,7 @@ const MOMENTS = {
 }
 
 const first = (name) => name.split(/\s+/)[0]
+const cut = (str, n) => (str.length > n ? `${str.slice(0, n - 1)}…` : str)
 const years = (S) => `${S.start.getFullYear()}${S.end.getFullYear() !== S.start.getFullYear() ? `–${S.end.getFullYear()}` : ''}`
 const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif'
 const big = (size, extra = {}) => ({ size, weight: 800, family: DISPLAY, spacing: -size * 0.04, ...extra })
@@ -76,8 +78,9 @@ const late = 1.1
  * out) } — adds the chapters, the ending, and takes the watermark off. Every slide has an id and
  * a label (for choosing which to keep). only: build just the slide with this id (a preview);
  * sculpt: false to skip building the sculptures (when only the slides' lengths and names matter).
+ * style: 'recap' (like a year in review) or 'film' (told like a film: see film.js).
  */
-export function makeStory(S, N, theme, premium = null, { only = null, sculpt = true } = {}) {
+export function makeStory(S, N, theme, premium = null, { only = null, sculpt = true, style = 'recap' } = {}) {
   shapes.usePalette(theme)
   const A = shapes.authors(S, N)
   const P = S.people
@@ -129,6 +132,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'first',
       label: 'Pesan pertama',
+      say: { kicker: V.first, lines: [`${date(new Date(m.t), { day: 'numeric', month: 'long', year: 'numeric' })}, pukul ${date(new Date(m.t), { hour: '2-digit', minute: '2-digit' })}.`, `“${cut(m.text, 80)}” — ${first(m.author)}`] },
       duration: 6.5,
       shape: () => shapes.spark(N, A, ai),
       cam: { pos: [0, 2.0, 7.8], look: [0, 1.0, 0], orbit: 0.45, speed: 0.25 },
@@ -157,6 +161,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'moment',
       label: PM.first[1],
+      say: { kicker: PM.first[1], lines: [`${date(d, { day: 'numeric', month: 'long', year: 'numeric' })}.`, `“${cut(m.text, 80)}” — ${first(m.author)}, duluan.`] },
       duration: 7,
       shape: () => shapes.words(N, A, `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`, { width: 1.9 }),
       cam: { pos: [0, 1.6, 8.4], look: [0, 0.35, 0], orbit: 0.3, speed: 0.3 },
@@ -180,6 +185,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
   add({
     id: 'total',
     label: 'Total pesan',
+    say: { kicker: 'Sejak hari itu', lines: [`${num(S.total)} pesan. ${num(S.words)} kata.`, `Kalau dicetak, jadi buku setebal ${num(pages)} halaman.`] },
     duration: 6.5,
     shape: () => shapes.words(N, A, num(S.total), { width: 2.1 }),
     cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
@@ -199,6 +205,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'share',
       label: V.share,
+      say: { kicker: V.share, lines: [`${first(P[0].name)} ${Math.round(P[0].share * 100)}%, ${first(P[1].name)} ${Math.round(P[1].share * 100)}%.`, P[0].messages > P[1].messages ? `${first(P[0].name)} ngirim ${num(P[0].messages - P[1].messages)} pesan lebih banyak.` : 'Seimbang. Hampir persis.'] },
       duration: 6.5,
       shape: () => shapes.orbs(N, A, shares),
       cam: { pos: [0, 2.2, 9.8], look: [0, 0.85, 0], orbit: 0.4, speed: 0.22 },
@@ -233,6 +240,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'awards',
       label: 'Penghargaan',
+      say: { kicker: 'Penghargaan', lines: [`${first(ranked[0].name)}, juara satu ngobrol: ${num(ranked[0].messages)} pesan.`, awards.slice(1, 3).map(([title, p]) => `${title.replace(/^Si /, 'si ')}: ${first(p.name)}`).join(' · ')] },
       duration: 8,
       shape: () => shapes.podium(N, A, podiumTop),
       cam: { pos: [0, 2.6, 9.6], look: [0, 0.75, 0], orbit: 0.4, speed: 0.22 },
@@ -263,6 +271,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
       add({
         id: 'count',
         label: PM.count,
+        say: { kicker: PM.count, lines: [`${first(win.p.name)}: ${num(win.n)} ${PM.unit}.`, ranked[1] ? `${first(ranked[1].p.name)}: ${num(ranked[1].n)}.` : ''] },
         duration: 7,
         shape: () => shapes.towers(N, A, who6.map((x) => x.n)),
         cam: { pos: [0, 2.1, 8.4], look: [0, 1.0, 0], orbit: 0.3, speed: 0.2 },
@@ -291,6 +300,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
   add({
     id: 'starter',
     label: V.starter,
+    say: { kicker: V.starter, lines: [`${first(starter.name)}.`, `Membuka ${Math.round(starter.startShare * 100)}% dari ${num(S.conversations)} obrolan.`] },
     duration: 6.5,
     shape: () => S.group || si > 1 ? shapes.orbs(N, A, shares) : shapes.bridge(N, A, shares, si),
     cam: { pos: [0, 2.4, 10.4], look: [0, 1.1, 0], orbit: 0.35, speed: 0.22 },
@@ -313,6 +323,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'reply',
       label: 'Kecepatan bales',
+      say: { kicker: 'Kecepatan bales', lines: [`${first(fast.name)}, ${V.fast}`, sorted.map((p) => `${first(p.name)} ${duration(p.replyMedian)}`).join(' · ')] },
       duration: 6.5,
       shape: () => shapes.rings(N, A, speeds),
       cam: { pos: [0, 3.8, 8.2], look: [0, 0.9, 0], orbit: 0.35, speed: 0.2 },
@@ -340,6 +351,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
   add({
     id: 'hours',
     label: 'Jam kalian',
+    say: { kicker: 'Jam kalian', lines: [`Paling sering pukul ${String(S.peakHour).padStart(2, '0')}.00.`, night >= 3 ? V.night(night) : ''] },
     duration: 6.5,
     shape: () => shapes.pillars(N, A, S.hours, S.peakHour),
     cam: { pos: [0, 2.6, 9.4], look: [0, 0.75, -0.4], orbit: 0.3, speed: 0.2 },
@@ -357,6 +369,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
   add({
     id: 'days',
     label: 'Setiap hari',
+    say: { kicker: 'Setiap hari', lines: [`${num(S.activeDays)} dari ${num(S.spanDays)} hari, kalian ngobrol.`, `Paling rame ${date(S.busiest.date)}: ${num(S.busiest.n)} pesan.`] },
     duration: 7,
     shape: () => shapes.terrain(N, A, S.calendar, S.busiest),
     cam: { pos: [3.6, 1.7, 4.4], look: [-0.4, 0.2, 0], orbit: 0.25, speed: 0.2, dolly: 0.02 },
@@ -386,6 +399,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'quiet',
       label: PM.quiet,
+      say: { kicker: PM.quiet, lines: [`${long}. ${date(new Date(quiet.from), short)} – ${date(new Date(quiet.to), short)}.`, `Lalu ${first(quiet.breaker)} yang nyapa duluan${quiet.text ? `: “${cut(quiet.text, 60)}”` : '.'}`] },
       duration: 7,
       shape: () => shapes.apart(N, A),
       cam: { pos: [0, 2.2, 9.2], look: [0, 0.8, 0], orbit: 0.15, speed: 0.12 },
@@ -413,6 +427,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'words',
       label: V.words,
+      say: { kicker: V.words, lines: [`“${word}” — ${num(count)} kali.`, S.laughs ? `Plus ${num(S.laughs)}× wkwk, haha, hehe.` : ''] },
       duration: 7,
       shape: () => shapes.words(N, A, word, { width: 2.1 }),
       cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
@@ -438,6 +453,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'emoji',
       label: V.emoji,
+      say: { kicker: V.emoji, lines: [`${fav[0]}  ${num(fav[1])} kali dikirim.`] },
       duration: 6.5,
       shape: () => shapes.emoji(N, A, fav[0]),
       cam: { pos: [0, 1.9, 8], look: [0, 1.2, 0], orbit: 0.3, speed: 0.3 },
@@ -476,6 +492,12 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: sc.id,
       label: title,
+      say: {
+        kicker: title,
+        lines: sc.kind === 'quote' ? [`${date(new Date(m.t), { day: 'numeric', month: 'long', year: 'numeric' })}.`, `“${cut(m.text, 80)}” — ${first(m.author)}`]
+          : sc.kind === 'count' ? [`“${sc.phrase}” — ${num(sc.total)} kali.`, m ? `Pertama kali ${date(new Date(m.t))}, ${first(m.author)}.` : '']
+          : [`${date(new Date(sc.t), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}.`, `${num(sc.n)} pesan hari itu.`],
+      },
       duration: 7,
       shape: () => sceneShape(sc, S, N, A),
       cam: CAMS[sc.object],
@@ -546,6 +568,7 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'ending',
       label: 'Penutup',
+      message: msg,
       duration: msg ? Math.min(14, 9 + msg.length / 30) : 9,
       shape: () => premium.photo ? shapes.portrait(N, A, premium.photo) : theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
       cam: premium.photo ? { pos: [0, 1.6, 10.6], look: [0, 1.15, 0], orbit: 0.12, speed: 0.12, dolly: 0.006 } : { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
@@ -570,10 +593,12 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
 
   // premium: the scenes you switched off (never the cover)
   if (premium?.hidden?.size) for (let i = slides.length - 1; i > 0; i--) if (premium.hidden.has(slides[i].id)) slides.splice(i, 1)
+  if (style === 'film') toFilm(slides, { S, who, theme, word: top[0]?.[0], N, A, shapes })
   // only now are the sculptures built (just the one, for a preview)
   if (only) slides.splice(0, slides.length, ...slides.filter((sl) => sl.id === only))
   if (sculpt) for (const sl of slides) sl.shape = sl.shape()
 
+  if (style === 'film') return slides
   for (const s of slides) {
     const draw = s.words
     s.words = (ctx, t) => {

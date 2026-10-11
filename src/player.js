@@ -17,7 +17,7 @@ export function compose(ctx, story, i, t) {
 }
 
 export class Player {
-  constructor({ canvas, bars, story, music = null, onChange }) {
+  constructor({ canvas, bars, story, music = null, film = false, onChange }) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
     canvas.width = W
@@ -34,7 +34,15 @@ export class Player {
     this.held = false
     this.alive = true
     bars.innerHTML = ''
-    this.fills = this.slides.map(() => {
+    // a film has one line for the whole of it (and the time), not a bar per slide
+    this.film = film
+    bars.classList.toggle('is-film', film)
+    if (film) {
+      bars.innerHTML = '<span><i></i></span><time></time>'
+      this.line = bars.querySelector('i')
+      this.clock = bars.querySelector('time')
+    }
+    this.fills = (film ? [] : this.slides).map(() => {
       const seg = document.createElement('span')
       const fill = document.createElement('i')
       seg.append(fill)
@@ -105,6 +113,12 @@ export class Player {
     }
     compose(this.ctx, this.story, this.i, this.t)
     this.fills.forEach((f, k) => (f.style.transform = `scaleX(${k < this.i ? 1 : k > this.i ? 0 : Math.min(1, this.t / this.slide.duration)})`))
+    if (this.film) {
+      const at = Math.min(this.end, this.story.starts[this.i] + this.t)
+      this.line.style.transform = `scaleX(${at / this.end})`
+      const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`
+      this.clock.textContent = `${mmss(at)} / ${mmss(this.end)}`
+    }
   }
 
   destroy() {

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#05080f" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -151,6 +151,14 @@
           </div>
           <input id="song-file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg" hidden />
         </div>
+        <div class="style-pick">
+          <span class="style-pick__label">Tonton sebagai</span>
+          <div id="style-pick" class="style-pick__switch" role="radiogroup" aria-label="Gaya film">
+            <button type="button" role="radio" data-style="recap" aria-checked="true">Rekap</button>
+            <button type="button" role="radio" data-style="film" aria-checked="false">Film</button>
+          </div>
+          <span id="style-hint" class="style-pick__hint">angka-angka besar, cepat, kayak year in review</span>
+        </div>
         <button id="studio-open" class="studio-cta" type="button">
           <span class="song__icon gift__icon" aria-hidden="true">✦</span>
           <span class="studio-cta__text">
@@ -261,6 +269,7 @@
     <section id="story" class="story" hidden>
       <div id="story-frame" class="story__frame">
         <div id="bars" class="bars"></div>
+        <span id="film-pause" class="film-pause" hidden aria-hidden="true"></span>
         <canvas id="story-canvas"></canvas>
       </div>
       <!-- what you can do with it: tucked away until you ask (the composer opens it) -->
