@@ -18,7 +18,11 @@ function stage(story) {
 /** The finished frame of slide i, as a PNG blob (1080 × 1920). */
 export async function slideImage(story, i) {
   const { c, ctx, restore } = stage(story)
+  // a still: without the beat's kick (its last moment is the next bar's one)
+  const { beat } = story
+  story.beat = null
   compose(ctx, story, i, story.slides[i].duration)
+  story.beat = beat
   restore()
   return new Promise((resolve) => c.toBlob(resolve, 'image/png'))
 }

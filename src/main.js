@@ -2,7 +2,9 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { makeStory } from './story/slides.js'
-import { Player } from './player.js'
+import { Player, pulse } from './player.js'
+import { readSong, suggestStart, snap, toBars } from './music/beat.js'
+import { Track } from './music/track.js'
 import { slideImage, storyVideo, canMakeVideo } from './export.js'
 import { Engine } from './three/engine.js'
 import { Stage } from './stage.js'
@@ -71,6 +73,7 @@ function stageFrame(now) {
   r.setProperty('--px', stage.mouse.x.toFixed(3))
   r.setProperty('--py', (-stage.mouse.y).toFixed(3))
   if (!landing.hidden) stage.target = scrollY / (deck[0].offsetHeight || innerHeight)
+  stage.engine.pulse = songFrame()
   stage.frame(now, innerWidth, innerHeight, pr)
   if (!landing.hidden) motion()
 }
@@ -250,7 +253,7 @@ function composerSay(text, state = '') {
 }
 // on the picker it plays the film (the paperclip still takes another file)
 function composerPlay() {
-  composerSay(`Putar film ${whoOf(chat.stats)}`, 'play')
+  composerSay(`Putar film ${whoOf(chat.stats)}${song ? ' ♪' : ''}`, 'play')
 }
 composer.addEventListener('click', (e) => {
   const state = composer.dataset.state
@@ -301,8 +304,172 @@ const pickerDrum = new Drum($('picker-drum'), THEME_LIST, {
   onChange: (t) => {
     chat.theme = t
     setTheme(t)
+    if (song) drawWave()
   },
 })
+
+// — a song for the film (optional): the scenes cut on its beat —
+// On the picker: add one, slide the lit part of its waveform to where the film should start (it
+// snaps to a beat, and we've already put it where the song kicks in), and choose whether the
+// scenes are cut to the beat or keep their own length. It plays while you choose, and the
+// sculpture kicks with it.
+let audio = null // the AudioContext: made on a tap (browsers only make sound after one)
+let song = null // { name, buffer, beat, start, mode: 'beat' | 'normal', track, paused }
+const songEl = $('song')
+const songWave = $('song-wave')
+const songCanvas = songWave.querySelector('canvas')
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+// the film's slides' own lengths (for this chat), and its length with this song
+let lengthsOf = null
+function lengths() {
+  if (lengthsOf?.chat !== chat) lengthsOf = { chat, d: makeStory(chat.stats, 300, chat.theme).map((s) => s.duration) }
+  return lengthsOf.d
+}
+const filmLength = () => (song.mode === 'beat' ? toBars(lengths(), song.beat.period) : lengths()).reduce((a, b) => a + b, 0)
+
+function drawWave() {
+  const r = songWave.getBoundingClientRect()
+  const k = Math.min(devicePixelRatio || 1, 2)
+  songCanvas.width = Math.round(r.width * k)
+  songCanvas.height = Math.round(r.height * k)
+  const g = songCanvas.getContext('2d')
+  const { peaks, duration } = song.beat
+  const len = filmLength()
+  const from = song.start / duration
+  const to = Math.min(1, (song.start + len) / duration)
+  songWave.style.setProperty('--from', from)
+  songWave.style.setProperty('--span', to - from)
+  $('song-at').textContent = `${mmss(song.start)} – ${mmss(Math.min(duration, song.start + len))}`
+  // bars like a voice note's: the part the film plays in the accent
+  const n = Math.max(24, Math.floor(r.width / 5))
+  const w = songCanvas.width / n
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+  for (let i = 0; i < n; i++) {
+    let m = 0
+    for (let j = Math.floor((i / n) * peaks.length); j < Math.floor(((i + 1) / n) * peaks.length); j++) m = Math.max(m, peaks[j])
+    const h = Math.max(3 * k, m ** 0.8 * songCanvas.height * 0.72)
+    const x = (i + 0.5) / n
+    g.fillStyle = x >= from && x <= to ? accent : 'rgba(242, 246, 255, 0.22)'
+    g.beginPath()
+    g.roundRect(i * w + w * 0.22, (songCanvas.height - h) / 2, w * 0.56, h, w * 0.28)
+    g.fill()
+  }
+}
+
+function songUI() {
+  const on = !!song
+  $('song-add').hidden = on
+  $('song-deck').hidden = !on
+  if (!on) return
+  $('song-name').textContent = song.name
+  $('song-bpm').textContent = `${Math.round(song.beat.bpm)} bpm`
+  const mode = $('song-mode')
+  for (const b of mode.querySelectorAll('button')) b.setAttribute('aria-checked', b.dataset.mode === song.mode)
+  const onBtn = mode.querySelector(`[data-mode="${song.mode}"]`)
+  mode.style.setProperty('--w', `${onBtn.offsetWidth}px`)
+  mode.style.setProperty('--x', `${onBtn.offsetLeft - 3}px`)
+  drawWave()
+  if (view === 'picker') composerPlay()
+}
+
+// the preview: the film's part of the song, round and round
+function preview(on = true) {
+  if (!song) return
+  song.paused = !on
+  if (on) song.track.play(song.start, 0.15)
+  else song.track.stop(0.25)
+}
+
+$('song-add').addEventListener('click', () => {
+  audio ??= new (window.AudioContext || window.webkitAudioContext)()
+  audio.resume()
+  $('song-file').click()
+})
+$('song-file').addEventListener('change', async () => {
+  const file = $('song-file').files[0]
+  $('song-file').value = ''
+  if (!file) return
+  songEl.classList.remove('is-error')
+  songEl.classList.add('is-busy')
+  $('song-hint').textContent = 'Dengerin lagunya…'
+  await wait(30)
+  try {
+    const { buffer, beat } = await readSong(file, audio)
+    song?.track.stop()
+    song = { name: file.name.replace(/\.[^.]+$/, ''), buffer, beat, mode: 'beat', track: new Track(audio, buffer), start: 0 }
+    song.start = suggestStart(beat, filmLength())
+    songUI()
+    preview()
+  } catch (err) {
+    console.error(err)
+    songEl.classList.add('is-error')
+    $('song-hint').textContent = 'Lagu ini nggak kebaca. Coba file mp3 atau m4a.'
+  } finally {
+    songEl.classList.remove('is-busy')
+  }
+})
+$('song-drop').addEventListener('click', () => {
+  song?.track.stop(0.3)
+  song = null
+  $('song-hint').textContent = 'opsional · scene-nya pindah pas di beat'
+  songUI()
+  composerPlay()
+})
+$('song-mode').addEventListener('click', (e) => {
+  const b = e.target.closest('button')
+  if (!b || !song || b.dataset.mode === song.mode) return
+  song.mode = b.dataset.mode
+  songUI()
+})
+// slide the lit part along (it snaps to a beat when you let go); a tap without sliding: play/pause
+{
+  let drag = null
+  songWave.addEventListener('pointerdown', (e) => {
+    if (!song) return
+    songWave.setPointerCapture(e.pointerId)
+    drag = { x: e.clientX, start: song.start, moved: false }
+  })
+  songWave.addEventListener('pointermove', (e) => {
+    if (!drag) return
+    const dx = e.clientX - drag.x
+    if (Math.abs(dx) > 4) drag.moved = true
+    if (!drag.moved) return
+    songWave.classList.add('is-dragging')
+    const { duration } = song.beat
+    song.start = Math.max(0, Math.min(duration - 4, drag.start + (dx / songWave.clientWidth) * duration))
+    drawWave()
+  })
+  const end = () => {
+    if (!drag) return
+    songWave.classList.remove('is-dragging')
+    if (drag.moved) {
+      song.start = snap(song.beat, song.start)
+      drawWave()
+      preview()
+    } else preview(song.paused || !song.track.on)
+    drag = null
+  }
+  songWave.addEventListener('pointerup', end)
+  songWave.addEventListener('pointercancel', end)
+  // a bar at a time with the keys
+  songWave.addEventListener('keydown', (e) => {
+    if (!song || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return
+    e.preventDefault()
+    const bar = 4 * song.beat.period
+    song.start = snap(song.beat, Math.max(0, Math.min(song.beat.duration - 4, song.start + (e.key === 'ArrowRight' ? bar : -bar))))
+    drawWave()
+    preview()
+  })
+}
+addEventListener('resize', () => song && view === 'picker' && drawWave())
+// every frame on the picker: round again at the end of the film's part; the sculpture kicks on the beat
+function songFrame() {
+  if (!song || view !== 'picker' || !song.track.on) return 0
+  const T = song.track.time - song.start
+  if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
+  return song.mode === 'beat' ? pulse({ period: song.beat.period }, T) : 0
+}
 
 // — reading a chat —
 
@@ -462,6 +629,7 @@ async function showPicker({ stats, guess }) {
   card.classList.remove('is-on', 'is-landing')
   composer.classList.remove('is-away')
   composerPlay()
+  if (song) songUI()
 }
 
 async function handle(file) {
@@ -494,6 +662,9 @@ async function play() {
   moves++
   await fontsReady
   const { stats, theme } = chat
+  // the preview fades; the film starts the song from the top of its part
+  song?.track.stop(0.9)
+  audio?.resume()
   // everything lifts off into the sky…
   composerSay('Menyiapkan film…', 'busy')
   paint(theme)
@@ -503,8 +674,11 @@ async function play() {
   restart($('flash'), 'is-on')
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
   const slides = makeStory(stats, N, theme)
+  // cut to the beat: every slide whole bars long, so every change lands on the one
+  const beat = song?.mode === 'beat' ? { period: song.beat.period } : null
+  if (beat) toBars(slides.map((sl) => sl.duration), beat.period).forEach((d, i) => (slides[i].duration = d))
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
-  story = { engine, slides }
+  story = { engine, slides, beat }
   picker.hidden = true
   landing.hidden = true
   storyView.hidden = false
@@ -512,7 +686,7 @@ async function play() {
   stageOn = false
   fitEngine()
   player?.destroy()
-  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story })
+  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, music: song && { track: song.track, start: song.start } })
   $('save-video').hidden = !canMakeVideo()
   composerSay(SAVE, 'save')
   scrollTo(0, 0)
@@ -525,6 +699,10 @@ function back() {
   player = null
   story = null
   chat = null
+  song?.track.stop(0.3)
+  song = null
+  $('song-hint').textContent = 'opsional · scene-nya pindah pas di beat'
+  songUI()
   storyView.hidden = true
   picker.hidden = true
   $('reading').hidden = true
@@ -706,4 +884,4 @@ $('again').addEventListener('click', () => {
   back()
 })
 
-if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, THEMES, setChat: (c) => (chat = c) }
+if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, THEMES, setChat: (c) => (chat = c), get song() { return song } }
