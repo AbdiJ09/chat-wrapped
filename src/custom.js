@@ -6,8 +6,19 @@ export function rename(S, names) {
   const n = (x) => names[x]?.trim() || x
   const said = (m) => m && { ...m, author: n(m.author) }
   const m = S.moments
+  const sc = S.script
+  const lines = (ls) => ls?.map(said)
   return {
     ...S,
+    script: sc && {
+      ...sc,
+      opening: lines(sc.opening),
+      skips: sc.skips.map((k) => ({ ...k, lines: lines(k.lines) })),
+      busiest: sc.busiest && { ...sc.busiest, lines: lines(sc.busiest.lines) },
+      night: sc.night && { ...sc.night, lines: lines(sc.night.lines) },
+      silence: sc.silence && { ...sc.silence, before: said(sc.silence.before), after: lines(sc.silence.after) },
+      now: lines(sc.now),
+    },
     people: S.people.map((p) => ({ ...p, name: n(p.name) })),
     first: said(S.first),
     starters: S.starters.map(n),

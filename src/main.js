@@ -2,6 +2,7 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
+import { screenplay } from './screenplay.js'
 import { rename, recolor, renameScenes } from './custom.js'
 import { MAX_SCENES, KINDS, OBJECTS, objectsFor, searchMessages, quoteScene, countScene, dayScene } from './story/scenes.js'
 import { makeStory, posterWords } from './story/slides.js'
@@ -468,7 +469,7 @@ function songFrame() {
 }
 
 // — recap or film: how the story is told —
-const STYLE_HINTS = { recap: 'angka-angka besar, cepat, kayak year in review', film: 'bab demi bab, narasi kayak subtitle, credits di akhir' }
+const STYLE_HINTS = { recap: 'angka-angka besar, cepat, kayak year in review', film: 'cerita kalian diputar kayak film: dialog dari chat, lompatan waktu, credits' }
 function styleUI() {
   const style = chat?.style ?? 'recap'
   const sw = $('style-pick')
@@ -1007,6 +1008,7 @@ function analyse(text, title) {
   if (parsed.messages.length < 30) throw new Error('Chat-nya terlalu pendek untuk diceritain. Coba chat yang lebih panjang.')
   const stats = computeStats(parsed, { title: parsed.people.length > 2 ? title : null })
   stats.moments = computeMoments(parsed.messages, parsed.people)
+  stats.script = screenplay(parsed.messages, stats)
   return { stats, guess: detectTheme(stats, text), messages: parsed.messages }
 }
 
