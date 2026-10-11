@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { findBeat, snap, suggestStart, toBars } from '../src/music/beat.js'
+import { findBeat, snap, suggestStart } from '../src/music/beat.js'
 
 // a made-up song: a kick on every beat, a hi-hat between, a little noise, quiet then loud
 function song({ bpm, first, seconds = 60, sr = 22050, loudFrom = Infinity }) {
@@ -41,9 +41,3 @@ test('suggests where the song gets loud', () => {
   assert.ok(Math.abs(s - 30.25) < 0.6, `start ${s}`)
 })
 
-test('slides become whole bars', () => {
-  const d = toBars([6.5, 8, 7], 0.5) // a bar is 2 s
-  assert.deepEqual(d, [6, 8, 8])
-  // a slow song: never shorter than the words need
-  assert.ok(toBars([6.5], 1.0).every((x) => x >= 4.5))
-})

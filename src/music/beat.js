@@ -1,4 +1,5 @@
-// Finding a song's beat, in the browser (the song isn't sent anywhere either).
+// Finding a song's beat, in the browser (the song isn't sent anywhere either): so the film's part
+// of it can start where the song kicks in, and on a beat wherever you slide it.
 //
 // The song is boiled down to how much it "hits" every 10 ms (the jump in loudness, mostly from the
 // low end where the kick drum is). The tempo is the spacing at which those hits line up best with
@@ -150,12 +151,6 @@ export function suggestStart(beat, length) {
     }
   }
   return best
-}
-
-/** Slide lengths stretched or shrunk to whole bars (4 beats), each long enough for its words. */
-export function toBars(durations, period) {
-  const bar = 4 * period
-  return durations.map((d) => bar * Math.max(Math.round(d / bar), Math.ceil(4.5 / bar)))
 }
 
 /** A song file → its decoded audio and its beat. */

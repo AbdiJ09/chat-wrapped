@@ -136,22 +136,17 @@
           <button id="song-add" class="song__add" type="button">
             <span class="song__icon" aria-hidden="true">♪</span>
             <span class="song__label">Pakai lagu</span>
-            <span id="song-hint" class="song__hint">opsional · scene-nya pindah pas di beat</span>
+            <span id="song-hint" class="song__hint">opsional · buat ngepasin sama lagu yang mau kamu pakai di IG</span>
           </button>
           <div id="song-deck" class="song__deck" hidden>
             <p class="song__top">
               <span class="song__icon" aria-hidden="true">♪</span>
               <b id="song-name"></b>
-              <span id="song-bpm" class="song__bpm"></span>
               <button id="song-drop" class="song__x" type="button" aria-label="Lepas lagunya">×</button>
             </p>
             <div id="song-wave" class="song__wave" tabindex="0" role="slider" aria-label="Mulai dari bagian mana">
               <canvas></canvas>
               <span class="song__window"><span id="song-at" class="song__at"></span></span>
-            </div>
-            <div id="song-mode" class="song__mode" role="radiogroup" aria-label="Potongan scene">
-              <button type="button" role="radio" data-mode="beat" aria-checked="true">Ikutin beat</button>
-              <button type="button" role="radio" data-mode="normal" aria-checked="false">Normal</button>
             </div>
           </div>
           <input id="song-file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg" hidden />

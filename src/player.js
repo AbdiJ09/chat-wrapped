@@ -3,23 +3,14 @@ import { W, H } from './story/draw.js'
 // Plays the story like an Instagram story: progress bars, tap right/left to skip, hold to pause.
 // Each frame: the 3D engine draws the bubbles, then the slide's words go on top, all into one
 // 1080 × 1920 canvas — the same canvas that gets saved as an image or recorded as video.
-// With a song, the song is the clock: the film is wherever the music is (and the slides were cut
-// to whole bars, so every change lands on the one); on the beat the bubbles give a little kick.
+// With a song (to hear how it'll go on Instagram), the song is the clock: the film is wherever the
+// music is.
 
 /** Where each slide starts in the film (seconds). */
 export const starts = (slides) => slides.reduce((a, s, i) => (a.push(i ? a[i - 1] + slides[i - 1].duration : 0), a), [])
 
-/** 0…1, a kick on every beat that dies away (stronger on the first of the bar). */
-export function pulse(beat, T) {
-  if (!beat || T < 0) return 0
-  const n = Math.floor(T / beat.period + 1e-6)
-  const since = T - n * beat.period
-  return Math.exp(-since / 0.11) * (n % 4 === 0 ? 1 : 0.55)
-}
-
 export function compose(ctx, story, i, t) {
   const { engine, slides } = story
-  engine.pulse = pulse(story.beat, story.starts[i] + t)
   engine.render(i, t)
   ctx.drawImage(engine.canvas, 0, 0, W, H)
   slides[i].words(ctx, t)

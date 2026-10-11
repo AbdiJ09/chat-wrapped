@@ -197,7 +197,6 @@ export class Engine {
     this.curve = 'inout' // 'out': the flight starts at full speed (a bang)
     this.radial = 0 // in flight, thrown this far outwards from the middle
     this.squeeze = 1 // everything drawn in towards (or out from) the middle by this factor
-    this.pulse = 0 // 0…1: the music's beat, a kick outwards and a flare of light
     this.lean = null // { x, y } in −1…1: the camera leans with the cursor
 
     this.composer = new EffectComposer(renderer)
@@ -289,7 +288,7 @@ export class Engine {
     const stagger = this.stagger
     const out = this.curve === 'out'
     const radial = this.radial
-    const sq = this.squeeze * (1 + 0.035 * this.pulse)
+    const sq = this.squeeze
     for (let k = 0; k < this.N; k++) {
       const k3 = k * 3
       const s0 = S[k * 4]
@@ -418,7 +417,6 @@ export class Engine {
     if (ox || oy) this.camera.setViewOffset(w, h, -ox * w, oy * h, w, h)
     else if (this.camera.view) this.camera.clearViewOffset()
     if (this.bokeh) this.bokeh.uniforms.focus.value = now.p.distanceTo(now.look)
-    this.bloom.strength = 0.32 * (1 + 0.8 * this.pulse)
     this.lens.uniforms.uKick.value = pb.cam ? Math.sin(Math.PI * Math.min(1, mt / 1.2)) ** 2 * 0.6 * Math.min(1.6, this.burst) : 0
     // the room's colours drift to the new slide's
     if (!pb.bg) Object.assign(pb, { bg: s.bg, glow: s.glow, rim: s.rim })

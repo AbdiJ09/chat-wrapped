@@ -2,8 +2,8 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { makeStory } from './story/slides.js'
-import { Player, pulse } from './player.js'
-import { readSong, suggestStart, snap, toBars } from './music/beat.js'
+import { Player } from './player.js'
+import { readSong, suggestStart, snap } from './music/beat.js'
 import { Track } from './music/track.js'
 import { slideImage, storyVideo, canMakeVideo } from './export.js'
 import { Engine } from './three/engine.js'
@@ -73,7 +73,7 @@ function stageFrame(now) {
   r.setProperty('--px', stage.mouse.x.toFixed(3))
   r.setProperty('--py', (-stage.mouse.y).toFixed(3))
   if (!landing.hidden) stage.target = scrollY / (deck[0].offsetHeight || innerHeight)
-  stage.engine.pulse = songFrame()
+  songFrame()
   stage.frame(now, innerWidth, innerHeight, pr)
   if (!landing.hidden) motion()
 }
@@ -308,25 +308,25 @@ const pickerDrum = new Drum($('picker-drum'), THEME_LIST, {
   },
 })
 
-// — a song for the film (optional): the scenes cut on its beat —
-// On the picker: add one, slide the lit part of its waveform to where the film should start (it
-// snaps to a beat, and we've already put it where the song kicks in), and choose whether the
-// scenes are cut to the beat or keep their own length. It plays while you choose, and the
-// sculpture kicks with it.
+// — a song to watch the film with (optional) —
+// Only to hear how the film goes with the song you'll put on it on Instagram: it plays with the
+// film here, and the saved video stays silent (you add the song there, from the time we tell you).
+// On the picker: add one, and slide the lit part of its waveform to where the film should start
+// (it snaps to a beat; we've already put it where the song kicks in). It plays while you choose.
 let audio = null // the AudioContext: made on a tap (browsers only make sound after one)
-let song = null // { name, buffer, beat, start, mode: 'beat' | 'normal', track, paused }
+let song = null // { name, buffer, beat, start, track, paused }
 const songEl = $('song')
 const songWave = $('song-wave')
 const songCanvas = songWave.querySelector('canvas')
+const HINT = 'opsional · buat ngepasin sama lagu yang mau kamu pakai di IG'
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-// the film's slides' own lengths (for this chat), and its length with this song
-let lengthsOf = null
-function lengths() {
-  if (lengthsOf?.chat !== chat) lengthsOf = { chat, d: makeStory(chat.stats, 300, chat.theme).map((s) => s.duration) }
-  return lengthsOf.d
+// how long this chat's film is
+let lengthOf = null
+function filmLength() {
+  if (lengthOf?.chat !== chat) lengthOf = { chat, s: makeStory(chat.stats, 300, chat.theme).reduce((a, s) => a + s.duration, 0) }
+  return lengthOf.s
 }
-const filmLength = () => (song.mode === 'beat' ? toBars(lengths(), song.beat.period) : lengths()).reduce((a, b) => a + b, 0)
 
 function drawWave() {
   const r = songWave.getBoundingClientRect()
@@ -363,12 +363,6 @@ function songUI() {
   $('song-deck').hidden = !on
   if (!on) return
   $('song-name').textContent = song.name
-  $('song-bpm').textContent = `${Math.round(song.beat.bpm)} bpm`
-  const mode = $('song-mode')
-  for (const b of mode.querySelectorAll('button')) b.setAttribute('aria-checked', b.dataset.mode === song.mode)
-  const onBtn = mode.querySelector(`[data-mode="${song.mode}"]`)
-  mode.style.setProperty('--w', `${onBtn.offsetWidth}px`)
-  mode.style.setProperty('--x', `${onBtn.offsetLeft - 3}px`)
   drawWave()
   if (view === 'picker') composerPlay()
 }
@@ -397,7 +391,7 @@ $('song-file').addEventListener('change', async () => {
   try {
     const { buffer, beat } = await readSong(file, audio)
     song?.track.stop()
-    song = { name: file.name.replace(/\.[^.]+$/, ''), buffer, beat, mode: 'beat', track: new Track(audio, buffer), start: 0 }
+    song = { name: file.name.replace(/\.[^.]+$/, ''), buffer, beat, track: new Track(audio, buffer), start: 0 }
     song.start = suggestStart(beat, filmLength())
     songUI()
     preview()
@@ -412,15 +406,9 @@ $('song-file').addEventListener('change', async () => {
 $('song-drop').addEventListener('click', () => {
   song?.track.stop(0.3)
   song = null
-  $('song-hint').textContent = 'opsional · scene-nya pindah pas di beat'
+  $('song-hint').textContent = HINT
   songUI()
   composerPlay()
-})
-$('song-mode').addEventListener('click', (e) => {
-  const b = e.target.closest('button')
-  if (!b || !song || b.dataset.mode === song.mode) return
-  song.mode = b.dataset.mode
-  songUI()
 })
 // slide the lit part along (it snaps to a beat when you let go); a tap without sliding: play/pause
 {
@@ -463,12 +451,11 @@ $('song-mode').addEventListener('click', (e) => {
   })
 }
 addEventListener('resize', () => song && view === 'picker' && drawWave())
-// every frame on the picker: round again at the end of the film's part; the sculpture kicks on the beat
+// every frame on the picker: round again at the end of the film's part
 function songFrame() {
-  if (!song || view !== 'picker' || !song.track.on) return 0
+  if (!song || view !== 'picker' || !song.track.on) return
   const T = song.track.time - song.start
   if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
-  return song.mode === 'beat' ? pulse({ period: song.beat.period }, T) : 0
 }
 
 // — reading a chat —
@@ -674,11 +661,8 @@ async function play() {
   restart($('flash'), 'is-on')
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
   const slides = makeStory(stats, N, theme)
-  // cut to the beat: every slide whole bars long, so every change lands on the one
-  const beat = song?.mode === 'beat' ? { period: song.beat.period } : null
-  if (beat) toBars(slides.map((sl) => sl.duration), beat.period).forEach((d, i) => (slides[i].duration = d))
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
-  story = { engine, slides, beat }
+  story = { engine, slides }
   picker.hidden = true
   landing.hidden = true
   storyView.hidden = false
@@ -688,6 +672,8 @@ async function play() {
   player?.destroy()
   player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, music: song && { track: song.track, start: song.start } })
   $('save-video').hidden = !canMakeVideo()
+  // the video is silent: on Instagram, the song goes on from where it starts here
+  $('save-video').querySelector('small').textContent = song ? `Tanpa suara · di IG, mulai lagunya dari ${mmss(song.start)}` : 'MP4 1080×1920, siap story & reels'
   composerSay(SAVE, 'save')
   scrollTo(0, 0)
 }
@@ -701,7 +687,7 @@ function back() {
   chat = null
   song?.track.stop(0.3)
   song = null
-  $('song-hint').textContent = 'opsional · scene-nya pindah pas di beat'
+  $('song-hint').textContent = HINT
   songUI()
   storyView.hidden = true
   picker.hidden = true
