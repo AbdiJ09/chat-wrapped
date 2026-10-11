@@ -18,6 +18,13 @@ just like what have get got can its im dont
 `.split(/\s+/).filter(Boolean))
 const LAUGH = /\b(w+k+w*k*[wk]*|(?:ha){2,}h?|(?:he){2,}h?|(?:hi){2,}h?|a+wo+k\w*|ak+wk\w*|xi(?:xi)+|lol+|lmao+)\b/gi
 const EMOJI = /\p{Extended_Pictographic}/u
+// what you call each other (besides your names): pet names and the like
+const CALLS = new Set(`
+sayang syg sayangku ayang ayangku beb bebeb bebi baby bby babe honey hun darling cantik ganteng bub bubu
+ndut gendut cil bocil dek adek adik kakak bestie bes bro bre cuy coy sis gan bos boss
+`.split(/\s+/).filter(Boolean))
+// a word, however it's stretched: "sayanggg", "sayangg" and "sayang" are one, "bangeeet" is "bangeet"
+const stem = (w) => w.replace(/(.)\1{2,}/g, '$1$1').replace(/(\p{L})\1+$/u, '$1')
 const URL = /https?:\/\/\S+|www\.\S+/g
 
 const dayKey = (t) => {
@@ -33,8 +40,12 @@ const median = (arr) => {
 export function computeStats({ messages, people }, { title = null } = {}) {
   const by = new Map(people.map((p) => [p, {
     name: p, messages: 0, words: 0, media: 0, deleted: 0, starts: 0, laughs: 0, night: 0,
-    replies: [], words_: new Map(), emoji: new Map(), longest: null,
+    replies: [], words_: new Map(), calls: new Map(), emoji: new Map(), longest: null,
   }]))
+  // how each word is written, most often (to show it the way you write it)
+  const forms = new Map()
+  // everyone's name, as a word (the first word of it): what the others may call them
+  const names = new Map(people.map((p) => [p, stem(p.toLowerCase().match(/\p{L}+/u)?.[0] ?? '')]))
   const hours = new Array(24).fill(0)
   const weekdays = new Array(7).fill(0)
   const days = new Map() // dayKey → count
@@ -88,10 +99,14 @@ export function computeStats({ messages, people }, { title = null } = {}) {
     for (const raw of tokens) {
       if (raw.length < 3 || /^\d+$/.test(raw) || STOP.has(raw)) continue
       if (/^(w+k+[wk]*|(ha)+h?|(he)+h?|(hi)+h?)$/.test(raw)) continue // laughter is counted on its own
-      // "yaaaa" and "yaa" are the same word
-      const w = raw.replace(/(.)\1{2,}/g, '$1$1')
+      const w = stem(raw)
+      // a pet name, or (the start of) someone else's name
+      if (CALLS.has(w) || people.some((q) => q !== m.author && w.length >= 3 && names.get(q).startsWith(w))) p.calls.set(w, (p.calls.get(w) ?? 0) + 1)
       if (STOP.has(w)) continue
       p.words_.set(w, (p.words_.get(w) ?? 0) + 1)
+      const f = forms.get(w) ?? new Map()
+      f.set(raw, (f.get(raw) ?? 0) + 1)
+      forms.set(w, f)
     }
     if (EMOJI.test(text)) {
       const graphemes = segmenter ? [...segmenter.segment(text)].map((s) => s.segment) : [...text]
@@ -125,6 +140,7 @@ export function computeStats({ messages, people }, { title = null } = {}) {
   const peakHour = hours.indexOf(Math.max(...hours))
   const night = hours.slice(0, 4).reduce((a, b) => a + b, 0) // midnight to 4am
 
+  const shown = (w) => [...(forms.get(w) ?? [[w, 1]])].sort((a, b) => b[1] - a[1])[0][0]
   const persons = people.map((name) => {
     const p = by.get(name)
     return {
@@ -142,23 +158,27 @@ export function computeStats({ messages, people }, { title = null } = {}) {
       laughs: p.laughs,
       night: p.night,
       longest: p.longest,
-      topWords: [...p.words_.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12),
+      topWords: [...p.words_.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([w, n]) => [shown(w), n]),
+      // what they call the other one(s) most
+      calls: [...p.calls.entries()].sort((a, b) => b[1] - a[1]).filter(([, n]) => n >= 5).slice(0, 1).map(([w, n]) => [shown(w), n])[0] ?? null,
       topEmoji: [...p.emoji.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
     }
   })
 
   // words that are distinctly one person's: used a lot, and far more by them than the others
+  // (share: how much of everyone's use of it is theirs)
   for (const p of persons) {
     const mine = by.get(p.name).words_
-    let bestWord = null
+    const list = []
     for (const [w, n] of mine) {
       if (n < 5) continue
       let others = 0
       for (const q of persons) if (q !== p) others += by.get(q.name).words_.get(w) ?? 0
-      const score = n / (others + 2)
-      if (!bestWord || score > bestWord.score) bestWord = { word: w, n, score }
+      if (n / (n + others) < 0.7) continue
+      list.push({ word: shown(w), n, share: n / (n + others), score: n / (others + 2) })
     }
-    p.signature = bestWord
+    p.signatures = list.sort((a, b) => b.score - a.score).slice(0, 3)
+    p.signature = p.signatures[0] ?? null
   }
 
   return {

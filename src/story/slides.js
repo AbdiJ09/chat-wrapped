@@ -420,14 +420,40 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
         shade(ctx)
         eyebrow(ctx, V.words, 250, MUTED, at(t, late))
         text(ctx, `${num(count)} kali.`, M, 330, head(48, { color: FG, alpha: at(t, late + 0.3) }))
+        // per person: what they call the other one (two of you), and their own words — the ones
+        // only they say (or, if none, what they say most)
         const colW = (W - 2 * M) / cols.length
+        const label = (str, x, y, a) => text(ctx, str.toUpperCase(), x, y, { size: 20, family: MONO, weight: 500, spacing: 3, color: MUTED, alpha: a })
+        // a word, made smaller if it would run into its count
+        const fit = (w, size, room) => {
+          const o = head(size)
+          const wd = measure(ctx, w, o)
+          return wd > room ? Math.floor((size * room) / wd) : size
+        }
+        const times = (n, x, y, a) => text(ctx, `${num(n)}×`, x, y, { size: 28, color: MUTED, align: 'right', alpha: a })
         cols.forEach((p, pi) => {
           const x = M + pi * colW
-          text(ctx, first(p.name), x, 1350, { size: 32, weight: 500, color: colorOf(pi), alpha: at(t, late + 0.6 + pi * 0.1) })
-          p.topWords.filter(([w]) => w !== word).slice(0, 3).forEach(([w], i) =>
-            text(ctx, w, x, 1420 + i * 64, head(52, { color: FG, alpha: at(t, late + 0.8 + pi * 0.1 + i * 0.12) })))
+          const right = x + colW - 40
+          const d = late + 0.6 + pi * 0.12
+          let y = S.group ? 1350 : 1330
+          text(ctx, first(p.name), x, y, { size: 32, weight: 500, color: colorOf(pi), alpha: at(t, d) })
+          const other = !S.group && P[1 - pi]
+          if (other && p.calls) {
+            const to = first(other.name)
+            label(`manggil ${to.length > 12 ? `${to.slice(0, 11)}…` : to}`, x, y + 60, at(t, d + 0.15))
+            text(ctx, p.calls[0], x, y + 136, head(fit(p.calls[0], 64, colW - 160), { color: FG, alpha: at(t, d + 0.25), rise: 30 }))
+            times(p.calls[1], right, y + 136, at(t, d + 0.35))
+            y += 150
+          }
+          const own = p.signatures.length ? p.signatures.map((x) => [x.word, x.n]) : p.topWords.filter(([w]) => w !== word).slice(0, 3)
+          label(p.signatures.length ? 'kata khas' : 'sering bilang', x, y + 60, at(t, d + 0.45))
+          own.slice(0, 3).forEach(([w, n], i) => {
+            const a = at(t, d + 0.55 + i * 0.12)
+            text(ctx, w, x, y + 124 + i * 60, head(fit(w, 46, colW - 140), { color: FG, alpha: a }))
+            times(n, right, y + 124 + i * 60, a)
+          })
         })
-        if (S.laughs > 0) text(ctx, `Plus ${num(S.laughs)}× wkwk, haha, hehe.`, M, 1740, { size: 32, color: MUTED, alpha: at(t, late + 1.8) })
+        if (S.laughs > 0) text(ctx, `Plus ${num(S.laughs)}× wkwk, haha, hehe.`, M, 1780, { size: 32, color: MUTED, alpha: at(t, late + 1.8) })
       },
     })
   }
