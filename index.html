@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Chat Wrapped</title>
-    <meta name="description" content="Ubah chat WhatsApp jadi film 3D: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
+    <meta name="description" content="Rekap chat WhatsApp kalian: siapa yang nyapa duluan, jam paling rame, kata-kata khas kalian. Diproses di browsermu, nggak pernah di-upload." />
     <meta name="theme-color" content="#05080f" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -22,12 +22,12 @@
 
       <section class="scene hero" data-scene="badge" data-cta="Pilih file chat" data-label="Mulai">
         <div class="col">
-          <p class="tag"><span class="dot"></span> <span data-decode>WhatsApp → film 3D</span></p>
-          <h1 class="hero__title" data-split><span>Chat kalian,</span><span class="hero__accent">jadi film.</span></h1>
-          <p class="lede body">Ribuan pesan kalian jadi ribuan bubble 3D, yang nyusun diri jadi siapa paling bawel, jam paling rame, sampai kota dari setiap hari kalian. Simpan jadi video buat story.</p>
+          <p class="tag"><span class="dot"></span> <span data-decode>WhatsApp → rekap</span></p>
+          <h1 class="hero__title" data-split><span>Chat kalian,</span><span class="hero__accent">jadi rekap.</span></h1>
+          <p class="lede body">Ribuan pesan kalian dirangkum jadi satu rekap: siapa paling bawel, siapa yang nyapa duluan, jam paling rame, sampai kata andalan kalian. Simpan jadi video atau gambar buat story.</p>
           <!-- the way in: a message from us, then the composer at the bottom of the screen -->
           <div class="thread">
-            <p class="msg"><span class="msg__typing" aria-hidden="true"><i></i><i></i><i></i></span><span class="msg__text">Kirim export chat kalian lewat kolom di bawah, nanti aku jadiin film.</span></p>
+            <p class="msg"><span class="msg__typing" aria-hidden="true"><i></i><i></i><i></i></span><span class="msg__text">Kirim export chat kalian lewat kolom di bawah, nanti aku bikinin rekapnya.</span></p>
             <p class="msg"><span class="msg__typing" aria-hidden="true"><i></i><i></i><i></i></span><span class="msg__text">Belum yakin? <button id="demo" class="msg__link">Tonton punya Nadia &amp; Raka dulu <span class="msg__play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L9.9 6.7a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg></span></button></span></p>
           </div>
           <input id="file" type="file" accept=".txt,.zip,text/plain,application/zip" hidden />
@@ -71,11 +71,11 @@
         </div>
       </section>
 
-      <section class="scene chapter" data-scene="galaxy" data-cta="Bikin film kalian" data-label="Filmnya">
+      <section class="scene chapter" data-scene="galaxy" data-cta="Bikin rekap kalian" data-label="Rekapnya">
         <span class="ghost" aria-hidden="true">05</span>
         <div class="col">
-          <p class="eyebrow"><b>05</b> <span data-decode>Filmnya</span></p>
-          <h2 data-split>Sebelas adegan, satu film.</h2>
+          <p class="eyebrow"><b>05</b> <span data-decode>Rekapnya</span></p>
+          <h2 data-split>Sebelas slide, satu rekap.</h2>
           <p class="body">1080×1920, siap story &amp; reels. Dirender di browsermu, frame demi frame.</p>
         </div>
       </section>
@@ -151,18 +151,10 @@
           </div>
           <input id="song-file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg" hidden />
         </div>
-        <div class="style-pick">
-          <span class="style-pick__label">Tonton sebagai</span>
-          <div id="style-pick" class="style-pick__switch" role="radiogroup" aria-label="Gaya film">
-            <button type="button" role="radio" data-style="recap" aria-checked="true">Rekap</button>
-            <button type="button" role="radio" data-style="film" aria-checked="false">Film</button>
-          </div>
-          <span id="style-hint" class="style-pick__hint">angka-angka besar, cepat, kayak year in review</span>
-        </div>
         <button id="studio-open" class="studio-cta" type="button">
           <span class="song__icon gift__icon" aria-hidden="true">✦</span>
           <span class="studio-cta__text">
-            <b id="studio-cta-title">Custom film kalian</b>
+            <b id="studio-cta-title">Custom rekap kalian</b>
             <small id="studio-cta-sub">foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri</small>
           </span>
           <span class="gift__badge">Premium</span>
@@ -195,20 +187,20 @@
       </div>
       <div id="studio-panel" class="studio__panel">
         <section class="studio__pane" data-pane="0">
-          <h3>Judul film</h3>
+          <h3>Judul rekap</h3>
           <p>Muncul besar di sampul dan di poster.</p>
           <input id="custom-title" class="studio__big" maxlength="40" autocomplete="off" />
           <div id="title-ideas" class="studio__ideas"></div>
         </section>
         <section class="studio__pane" data-pane="1" hidden>
           <h3>Kalian</h3>
-          <p>Nama panggilan dan warna gelembung masing-masing. Berlaku di seluruh film.</p>
+          <p>Nama panggilan dan warna gelembung masing-masing. Berlaku di seluruh rekap.</p>
           <div id="custom-people" class="studio__people"></div>
           <button id="custom-reset" class="studio__link" type="button" hidden>Balik ke warna tema</button>
         </section>
         <section class="studio__pane" data-pane="2" hidden>
           <h3>Foto &amp; pesan penutup</h3>
-          <p>Ribuan gelembung chat kalian menyusun foto ini di akhir film, lalu pesanmu muncul huruf demi huruf.</p>
+          <p>Ribuan gelembung chat kalian menyusun foto ini di akhir rekap, lalu pesanmu muncul huruf demi huruf.</p>
           <div class="studio__photo-row">
             <button id="gift-photo" class="gift__photo studio__photo" type="button" aria-label="Pilih foto kalian">
               <canvas hidden></canvas>
@@ -269,7 +261,6 @@
     <section id="story" class="story" hidden>
       <div id="story-frame" class="story__frame">
         <div id="bars" class="bars"></div>
-        <span id="film-pause" class="film-pause" hidden aria-hidden="true"></span>
         <canvas id="story-canvas"></canvas>
       </div>
       <!-- what you can do with it: tucked away until you ask (the composer opens it) -->

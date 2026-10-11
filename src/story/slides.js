@@ -1,7 +1,6 @@
 import { W, H, M, DISPLAY, MONO, at, clamp, easeInOut, num, date, duration, text, wrap, eyebrow, measure, drawGrain } from './draw.js'
 import * as shapes from '../three/shapes.js'
 import { KINDS, CAMS, sceneShape, sceneMessage } from './scenes.js'
-import { toFilm } from './film.js'
 
 // The story: each slide is a sculpture for the bubbles (with a camera and a backdrop) plus a
 // layer of words on top. The middle of the frame belongs to the 3D; words live above and below.
@@ -77,9 +76,8 @@ const late = 1.1
  * out) } — adds the chapters, the ending, and takes the watermark off. Every slide has an id and
  * a label (for choosing which to keep). only: build just the slide with this id (a preview);
  * sculpt: false to skip building the sculptures (when only the slides' lengths and names matter).
- * style: 'recap' (like a year in review) or 'film' (told like a film: see film.js).
  */
-export function makeStory(S, N, theme, premium = null, { only = null, sculpt = true, style = 'recap' } = {}) {
+export function makeStory(S, N, theme, premium = null, { only = null, sculpt = true } = {}) {
   shapes.usePalette(theme)
   const A = shapes.authors(S, N)
   const P = S.people
@@ -478,7 +476,6 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: sc.id,
       label: title,
-      scene: sc,
       duration: 7,
       shape: () => sceneShape(sc, S, N, A),
       cam: CAMS[sc.object],
@@ -549,7 +546,6 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     add({
       id: 'ending',
       label: 'Penutup',
-      message: msg,
       duration: msg ? Math.min(14, 9 + msg.length / 30) : 9,
       shape: () => premium.photo ? shapes.portrait(N, A, premium.photo) : theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
       cam: premium.photo ? { pos: [0, 1.6, 10.6], look: [0, 1.15, 0], orbit: 0.12, speed: 0.12, dolly: 0.006 } : { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
@@ -572,14 +568,12 @@ export function makeStory(S, N, theme, premium = null, { only = null, sculpt = t
     })
   }
 
-  if (style === 'film') toFilm(slides, { S, who, theme, word: top[0] && { word: top[0][0], count: top[0][1] }, N, A, shapes, shares, colorOf })
-  // premium: the scenes you switched off (never the first)
+  // premium: the scenes you switched off (never the cover)
   if (premium?.hidden?.size) for (let i = slides.length - 1; i > 0; i--) if (premium.hidden.has(slides[i].id)) slides.splice(i, 1)
   // only now are the sculptures built (just the one, for a preview)
   if (only) slides.splice(0, slides.length, ...slides.filter((sl) => sl.id === only))
   if (sculpt) for (const sl of slides) sl.shape = sl.shape()
 
-  if (style === 'film') return slides
   for (const s of slides) {
     const draw = s.words
     s.words = (ctx, t) => {

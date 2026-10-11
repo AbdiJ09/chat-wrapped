@@ -2,7 +2,6 @@ import { unzipSync, zipSync } from 'fflate'
 import { parseWhatsApp, ChatFormatError } from './parse/whatsapp.js'
 import { computeStats } from './stats.js'
 import { computeMoments } from './moments.js'
-import { screenplay } from './screenplay.js'
 import { rename, recolor, renameScenes } from './custom.js'
 import { MAX_SCENES, KINDS, OBJECTS, objectsFor, searchMessages, quoteScene, countScene, dayScene } from './story/scenes.js'
 import { makeStory, posterWords } from './story/slides.js'
@@ -41,8 +40,6 @@ const fontsReady = Promise.all([
   document.fonts.load('400 40px "Geist"'),
   document.fonts.load('500 40px "Geist"'),
   document.fonts.load('500 40px "Geist Mono"'),
-  document.fonts.load('400 60px "Instrument Serif"'),
-  document.fonts.load('italic 400 60px "Instrument Serif"'),
 ]).catch(() => {})
 
 // — the page's colours follow the theme too —
@@ -177,7 +174,7 @@ const DEMO = demoStats()
     pillars: [['jam paling rame', `${String(S.peakHour).padStart(2, '0')}.00`], ['lewat tengah malam', `${Math.round(S.nightShare * 100)}%`]],
     terrain: [['hari ngobrol', S.activeDays], ['paling rame', `${short.format(S.busiest.date)} · ${S.busiest.n}`], ['rekor', `${S.streak.length} hari`]],
     emoji: [[fav?.[0] ?? '💬', `${fav?.[1] ?? 0}×`], ['ketawa', `${S.laughs.toLocaleString('id-ID')}×`]],
-    galaxy: [['adegan', '11'], ['video', '1080×1920'], ['frame', '30/detik']],
+    galaxy: [['slide', '11'], ['video', '1080×1920'], ['frame', '30/detik']],
     cover: [['vibe', '5 pilihan'], ['tebakan', 'otomatis']],
     spark: [['di-upload', '0 byte'], ['diproses', 'di browsermu']],
   }
@@ -260,7 +257,7 @@ function composerSay(text, state = '') {
 }
 // on the picker it plays the film (the paperclip still takes another file)
 function composerPlay() {
-  composerSay(`Putar film ${$('picker-who').textContent || whoOf(chat.stats)}${song ? ' ♪' : ''}`, 'play')
+  composerSay(`Putar rekap ${$('picker-who').textContent || whoOf(chat.stats)}${song ? ' ♪' : ''}`, 'play')
 }
 composer.addEventListener('click', (e) => {
   const state = composer.dataset.state
@@ -332,9 +329,9 @@ const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart
 // those change
 let lengthOf = null
 function filmLength() {
-  const { stats, theme, premium, style } = film()
-  const key = style + (premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : '')
-  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium, { sculpt: false, style }).reduce((a, s) => a + s.duration, 0) }
+  const { stats, theme, premium } = film()
+  const key = premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : ''
+  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium, { sculpt: false }).reduce((a, s) => a + s.duration, 0) }
   return lengthOf.s
 }
 
@@ -468,29 +465,6 @@ function songFrame() {
   if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
 }
 
-// — recap or film: how the story is told —
-const STYLE_HINTS = { recap: 'angka-angka besar, cepat, kayak year in review', film: 'cerita kalian diputar kayak film: dialog dari chat, lompatan waktu, credits' }
-function styleUI() {
-  const style = chat?.style ?? 'recap'
-  const sw = $('style-pick')
-  for (const b of sw.querySelectorAll('button')) b.setAttribute('aria-checked', b.dataset.style === style)
-  const on = sw.querySelector(`[data-style="${style}"]`)
-  sw.style.setProperty('--w', `${on.offsetWidth}px`)
-  sw.style.setProperty('--x', `${on.offsetLeft - 3}px`)
-  const hint = $('style-hint')
-  if (hint.textContent !== STYLE_HINTS[style]) {
-    hint.textContent = STYLE_HINTS[style]
-    restart(hint, 'is-new')
-  }
-}
-$('style-pick').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-style]')
-  if (!b || !chat || b.dataset.style === chat.style) return
-  chat.style = b.dataset.style
-  styleUI()
-  if (song) drawWave()
-})
-
 // — premium: the studio —
 // No payment yet: it simply turns on. Out of the picker, into a page of its own: the film itself,
 // live, in a phone in the middle (each change shows at once: a new sculpture flies in, a new
@@ -505,7 +479,7 @@ function film() {
   const theme = recolor(chat.theme, gift?.colors)
   const stats = gift ? rename(chat.stats, gift.names) : chat.stats
   const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names) }
-  return { stats, theme, premium, style: chat.style ?? 'recap' }
+  return { stats, theme, premium }
 }
 // the picker's name line follows the title and the nicknames; its studio button, what you've done
 function showWho() {
@@ -514,7 +488,7 @@ function showWho() {
 }
 function studioCTA() {
   if (!gift) {
-    $('studio-cta-title').textContent = 'Custom film kalian'
+    $('studio-cta-title').textContent = 'Custom rekap kalian'
     $('studio-cta-sub').textContent = 'foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri'
     return
   }
@@ -526,7 +500,7 @@ function studioCTA() {
     gift.message.trim() && 'pesan',
     gift.scenes.length && `${gift.scenes.length} scene kamu`,
   ].filter(Boolean)
-  $('studio-cta-title').textContent = 'Film kalian udah di-custom ✓'
+  $('studio-cta-title').textContent = 'Rekap kalian udah di-custom ✓'
   $('studio-cta-sub').textContent = done.length ? `${done.join(' · ')} · ubah lagi` : 'buka studio lagi'
 }
 
@@ -551,9 +525,8 @@ function viewOf(i) {
   if (i === 0) return 'cover'
   if (i === 1) return chat.stats.group ? 'awards' : 'share'
   if (i === 2) return 'ending'
-  const last = chat.style === 'film' ? 'credits' : 'summary'
-  if (i === 3) return draft?.data ? 'draft' : gift.scenes.at(-1)?.id ?? last
-  return viewing ?? last
+  if (i === 3) return draft?.data ? 'draft' : gift.scenes.at(-1)?.id ?? 'summary'
+  return viewing ?? 'summary'
 }
 /**
  * Show slide id in the phone. how: 'fly' (a new sculpture: the bubbles fly there), 'wave' (the same
@@ -561,9 +534,9 @@ function viewOf(i) {
  */
 function preview(id, how = 'fly') {
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
-  const { stats, theme, premium, style } = film()
+  const { stats, theme, premium } = film()
   const scenes = draft?.data ? [...premium.scenes, { ...draft.data, object: draft.object, title: draft.title, id: 'draft' }] : premium.scenes
-  const make = (only) => makeStory(stats, N, theme, { ...premium, hidden: new Set(), scenes }, { only, style })
+  const make = (only) => makeStory(stats, N, theme, { ...premium, hidden: new Set(), scenes }, { only })
   let slides = make(id)
   if (!slides.length) slides = make((id = 'cover'))
   const now = performance.now()
@@ -611,7 +584,7 @@ function showStep(i) {
     if (on) restart(pane, 'is-in')
   }
   $('studio-prev').style.visibility = i ? 'visible' : 'hidden'
-  $('studio-next').textContent = i < STEPS.length - 1 ? `Lanjut: ${STEPS[i + 1]} →` : 'Putar film ✦'
+  $('studio-next').textContent = i < STEPS.length - 1 ? `Lanjut: ${STEPS[i + 1]} →` : 'Putar rekap ✦'
   if (draft && i !== 3) openMaker(false, { quiet: true })
   ;[fillCover, fillPeople, fillPhoto, makerList, fillScenes][i]()
   $('studio-panel').scrollTop = 0
@@ -753,8 +726,8 @@ $('gift-file').addEventListener('change', async () => {
 
 // 5. which scenes: tap one to see it, tap it again to switch it off (or on)
 function fillScenes() {
-  const { stats, theme, premium, style } = film()
-  const slides = makeStory(stats, 300, theme, { ...premium, hidden: new Set() }, { sculpt: false, style })
+  const { stats, theme, premium } = film()
+  const slides = makeStory(stats, 300, theme, { ...premium, hidden: new Set() }, { sculpt: false })
   $('custom-scenes').innerHTML = slides
     .map((sl) => `<button type="button" class="custom__scene${sl.id === viewing ? ' is-viewing' : ''}" data-id="${sl.id}" aria-pressed="${!gift.hidden.has(sl.id)}">${esc(sl.label)}</button>`)
     .join('')
@@ -1008,7 +981,6 @@ function analyse(text, title) {
   if (parsed.messages.length < 30) throw new Error('Chat-nya terlalu pendek untuk diceritain. Coba chat yang lebih panjang.')
   const stats = computeStats(parsed, { title: parsed.people.length > 2 ? title : null })
   stats.moments = computeMoments(parsed.messages, parsed.people)
-  stats.script = screenplay(parsed.messages, stats)
   return { stats, guess: detectTheme(stats, text), messages: parsed.messages }
 }
 
@@ -1145,7 +1117,6 @@ async function showPicker({ stats, guess, messages }) {
   if (song) songUI()
   showWho()
   studioCTA()
-  styleUI()
   if (gift?.photo) {
     stage.setPhoto(gift.photo)
     stage.show('portrait', { force: true })
@@ -1182,21 +1153,21 @@ async function play() {
   view = 'story'
   moves++
   await fontsReady
-  const { stats, theme, premium, style } = film()
+  const { stats, theme, premium } = film()
   // the preview fades; the film starts the song from the top of its part
   song?.track.stop(0.9)
   audio?.resume()
   // everything lifts off into the sky…
-  composerSay('Menyiapkan film…', 'busy')
+  composerSay('Menyiapkan rekap…', 'busy')
   paint(theme)
   stage.show('nebula', { theme })
   await new Promise((resolve) => setTimeout(resolve, 1300))
   $('flash').classList.remove('is-soft')
   restart($('flash'), 'is-on')
   engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
-  const slides = makeStory(stats, N, theme, premium, { style })
+  const slides = makeStory(stats, N, theme, premium)
   engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
-  story = { engine, slides, premium, stats, theme, film: style === 'film' }
+  story = { engine, slides, premium, stats, theme }
   picker.hidden = true
   landing.hidden = true
   storyView.hidden = false
@@ -1204,8 +1175,7 @@ async function play() {
   stageOn = false
   fitEngine()
   player?.destroy()
-  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, film: style === 'film', music: song && { track: song.track, start: song.start } })
-  $('film-pause').hidden = true
+  player = new Player({ canvas: $('story-canvas'), bars: $('bars'), story, music: song && { track: song.track, start: song.start } })
   $('save-video').hidden = !canMakeVideo()
   $('save-poster').hidden = !premium
   // the video is silent: on Instagram, the song goes on from where it starts here
@@ -1296,12 +1266,6 @@ frame.addEventListener('pointerup', (e) => {
   if (!player) return
   player.held = false
   if (held) return // that was a pause, not a tap
-  // a film isn't skipped through: a tap pauses it (or plays it again)
-  if (player.film) {
-    player.playing = !player.playing
-    $('film-pause').hidden = player.playing
-    return
-  }
   const r = frame.getBoundingClientRect()
   if (e.clientX - r.left < r.width * 0.3) player.prev()
   else player.next()
@@ -1319,7 +1283,6 @@ addEventListener('keydown', (e) => {
   if (e.key === ' ') {
     e.preventDefault()
     player.playing = !player.playing
-    if (player.film) $('film-pause').hidden = player.playing
   }
   if (e.key === 'Escape') sheet.classList.contains('is-open') ? openSheet(false) : back()
 })
@@ -1349,7 +1312,7 @@ async function deliver(blob, name, type) {
 
 // — under the film: the composer says "save", and opens a small sheet of what you can save —
 const sheet = $('sheet')
-const SAVE = 'Simpan film kalian'
+const SAVE = 'Simpan rekap kalian'
 function openSheet(on) {
   if (on) sheet.hidden = false
   void sheet.offsetWidth

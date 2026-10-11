@@ -154,28 +154,3 @@ test('premium: your own scenes from the chat (a word counted, a day, a search)',
   assert.equal(searchMessages(messages, 'v').length, 0, 'at least two letters')
   assert.ok(!objectsFor({ kind: 'count', phrase: 'kalimat yang panjang sekali' }).includes('text'))
 })
-
-test('the film\'s script: the opening, a week later, the silence, today', async () => {
-  const { computeStats } = await import('../src/stats.js')
-  const { screenplay } = await import('../src/screenplay.js')
-  const parsed = parseWhatsApp([
-    '01/03/24 21.11 - Hari: halo',
-    '01/03/24 21.12 - Uraaatu: hai, siapa ya?',
-    '01/03/24 21.13 - Hari: hari, temennya dinda',
-    '01/03/24 21.14 - Uraaatu: ohh iyaa',
-    '01/03/24 21.15 - Hari: cek https://example.com',
-    '08/03/24 20.00 - Hari: udah makan?',
-    '08/03/24 20.05 - Uraaatu: udah wkwk',
-    '20/03/24 08.00 - Uraaatu: pagi',
-    '25/03/24 09.00 - Hari: maaf ya kemarin',
-    '25/03/24 09.01 - Uraaatu: iyaa gapapa',
-  ].join('\n'))
-  const S = computeStats(parsed)
-  const sp = screenplay(parsed.messages, S)
-  assert.deepEqual(sp.opening.map((l) => l.text), ['halo', 'hai, siapa ya?', 'hari, temennya dinda', 'ohh iyaa'], 'links left out')
-  assert.equal(sp.skips[0].card, 'Seminggu kemudian.')
-  assert.equal(sp.skips[0].lines[0].text, 'udah makan?')
-  assert.equal(sp.silence.before.text, 'udah wkwk')
-  assert.equal(sp.silence.after[0].text, 'pagi')
-  assert.deepEqual(sp.now.map((l) => l.text).slice(-2), ['maaf ya kemarin', 'iyaa gapapa'])
-})
