@@ -74,9 +74,10 @@ const late = 1.1
  * premium (or null): { moments (computeMoments), photo (a 4:5 canvas, or null), message (your
  * words for the end, or ''), title (for the cover, or ''), hidden (a Set of slide ids to leave
  * out) } — adds the chapters, the ending, and takes the watermark off. Every slide has an id and
- * a label (for choosing which to keep).
+ * a label (for choosing which to keep). only: build just the slide with this id (a preview);
+ * sculpt: false to skip building the sculptures (when only the slides' lengths and names matter).
  */
-export function makeStory(S, N, theme, premium = null) {
+export function makeStory(S, N, theme, premium = null, { only = null, sculpt = true } = {}) {
   shapes.usePalette(theme)
   const A = shapes.authors(S, N)
   const P = S.people
@@ -104,7 +105,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'cover',
     label: 'Sampul',
     duration: 6.5,
-    shape: theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
+    shape: () => theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
     cam: { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
     words(ctx, t) {
       shade(ctx, false)
@@ -129,7 +130,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'first',
       label: 'Pesan pertama',
       duration: 6.5,
-      shape: shapes.spark(N, A, ai),
+      shape: () => shapes.spark(N, A, ai),
       cam: { pos: [0, 2.0, 7.8], look: [0, 1.0, 0], orbit: 0.45, speed: 0.25 },
       words(ctx, t) {
         shade(ctx)
@@ -157,7 +158,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'moment',
       label: PM.first[1],
       duration: 7,
-      shape: shapes.words(N, A, `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`, { width: 1.9 }),
+      shape: () => shapes.words(N, A, `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`, { width: 1.9 }),
       cam: { pos: [0, 1.6, 8.4], look: [0, 0.35, 0], orbit: 0.3, speed: 0.3 },
       words(ctx, t) {
         shade(ctx)
@@ -180,7 +181,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'total',
     label: 'Total pesan',
     duration: 6.5,
-    shape: shapes.words(N, A, num(S.total), { width: 2.1 }),
+    shape: () => shapes.words(N, A, num(S.total), { width: 2.1 }),
     cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
     words(ctx, t) {
       shade(ctx)
@@ -199,7 +200,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'share',
       label: V.share,
       duration: 6.5,
-      shape: shapes.orbs(N, A, shares),
+      shape: () => shapes.orbs(N, A, shares),
       cam: { pos: [0, 2.2, 9.8], look: [0, 0.85, 0], orbit: 0.4, speed: 0.22 },
       words(ctx, t) {
         shade(ctx)
@@ -233,7 +234,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'awards',
       label: 'Penghargaan',
       duration: 8,
-      shape: shapes.podium(N, A, podiumTop),
+      shape: () => shapes.podium(N, A, podiumTop),
       cam: { pos: [0, 2.6, 9.6], look: [0, 0.75, 0], orbit: 0.4, speed: 0.22 },
       words(ctx, t) {
         shade(ctx)
@@ -263,7 +264,7 @@ export function makeStory(S, N, theme, premium = null) {
         id: 'count',
         label: PM.count,
         duration: 7,
-        shape: shapes.towers(N, A, who6.map((x) => x.n)),
+        shape: () => shapes.towers(N, A, who6.map((x) => x.n)),
         cam: { pos: [0, 2.1, 8.4], look: [0, 1.0, 0], orbit: 0.3, speed: 0.2 },
         words(ctx, t) {
           shade(ctx)
@@ -291,7 +292,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'starter',
     label: V.starter,
     duration: 6.5,
-    shape: S.group || si > 1 ? shapes.orbs(N, A, shares) : shapes.bridge(N, A, shares, si),
+    shape: () => S.group || si > 1 ? shapes.orbs(N, A, shares) : shapes.bridge(N, A, shares, si),
     cam: { pos: [0, 2.4, 10.4], look: [0, 1.1, 0], orbit: 0.35, speed: 0.22 },
     words(ctx, t) {
       shade(ctx)
@@ -313,7 +314,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'reply',
       label: 'Kecepatan bales',
       duration: 6.5,
-      shape: shapes.rings(N, A, speeds),
+      shape: () => shapes.rings(N, A, speeds),
       cam: { pos: [0, 3.8, 8.2], look: [0, 0.9, 0], orbit: 0.35, speed: 0.2 },
       words(ctx, t) {
         shade(ctx)
@@ -340,7 +341,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'hours',
     label: 'Jam kalian',
     duration: 6.5,
-    shape: shapes.pillars(N, A, S.hours, S.peakHour),
+    shape: () => shapes.pillars(N, A, S.hours, S.peakHour),
     cam: { pos: [0, 2.6, 9.4], look: [0, 0.75, -0.4], orbit: 0.3, speed: 0.2 },
     words(ctx, t) {
       shade(ctx)
@@ -357,7 +358,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'days',
     label: 'Setiap hari',
     duration: 7,
-    shape: shapes.terrain(N, A, S.calendar, S.busiest),
+    shape: () => shapes.terrain(N, A, S.calendar, S.busiest),
     cam: { pos: [3.6, 1.7, 4.4], look: [-0.4, 0.2, 0], orbit: 0.25, speed: 0.2, dolly: 0.02 },
     words(ctx, t) {
       shade(ctx)
@@ -386,7 +387,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'quiet',
       label: PM.quiet,
       duration: 7,
-      shape: shapes.apart(N, A),
+      shape: () => shapes.apart(N, A),
       cam: { pos: [0, 2.2, 9.2], look: [0, 0.8, 0], orbit: 0.15, speed: 0.12 },
       words(ctx, t) {
         shade(ctx)
@@ -413,7 +414,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'words',
       label: V.words,
       duration: 7,
-      shape: shapes.words(N, A, word, { width: 2.1 }),
+      shape: () => shapes.words(N, A, word, { width: 2.1 }),
       cam: { pos: [0, 1.7, 8.6], look: [0, 0.25, 0], orbit: 0.3, speed: 0.3 },
       words(ctx, t) {
         shade(ctx)
@@ -438,7 +439,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: 'emoji',
       label: V.emoji,
       duration: 6.5,
-      shape: shapes.emoji(N, A, fav[0]),
+      shape: () => shapes.emoji(N, A, fav[0]),
       cam: { pos: [0, 1.9, 8], look: [0, 1.2, 0], orbit: 0.3, speed: 0.3 },
       words(ctx, t) {
         shade(ctx)
@@ -476,7 +477,7 @@ export function makeStory(S, N, theme, premium = null) {
       id: sc.id,
       label: title,
       duration: 7,
-      shape: sceneShape(sc, S, N, A),
+      shape: () => sceneShape(sc, S, N, A),
       cam: CAMS[sc.object],
       words(ctx, t) {
         shade(ctx)
@@ -521,7 +522,7 @@ export function makeStory(S, N, theme, premium = null) {
     id: 'summary',
     label: 'Semua dalam angka',
     duration: 8,
-    shape: shapes.galaxy(N, A),
+    shape: () => shapes.galaxy(N, A),
     cam: { pos: [0, 4.6, 9.4], look: [0, -0.1, 0], orbit: 0.6, speed: 0.15 },
     words(ctx, t) {
       shade(ctx)
@@ -540,13 +541,13 @@ export function makeStory(S, N, theme, premium = null) {
   })
 
   // — premium: the ending: your photo, made of every message, and your own words typed in —
-  if (premium && (premium.photo || premium.message)) {
+  if (premium && (premium.photo || premium.message || only === 'ending')) {
     const msg = premium.message.trim()
     add({
       id: 'ending',
       label: 'Penutup',
       duration: msg ? Math.min(14, 9 + msg.length / 30) : 9,
-      shape: premium.photo ? shapes.portrait(N, A, premium.photo) : theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
+      shape: () => premium.photo ? shapes.portrait(N, A, premium.photo) : theme.id === 'couple' ? shapes.heart(N, A) : shapes.helix(N, A, Math.min(P.length, 6)),
       cam: premium.photo ? { pos: [0, 1.6, 10.6], look: [0, 1.15, 0], orbit: 0.12, speed: 0.12, dolly: 0.006 } : { pos: [0, 2.4, 12.6], look: [0, 1.15, 0], orbit: 0.35, speed: 0.25 },
       words(ctx, t) {
         shade(ctx, false)
@@ -569,6 +570,9 @@ export function makeStory(S, N, theme, premium = null) {
 
   // premium: the scenes you switched off (never the cover)
   if (premium?.hidden?.size) for (let i = slides.length - 1; i > 0; i--) if (premium.hidden.has(slides[i].id)) slides.splice(i, 1)
+  // only now are the sculptures built (just the one, for a preview)
+  if (only) slides.splice(0, slides.length, ...slides.filter((sl) => sl.id === only))
+  if (sculpt) for (const sl of slides) sl.shape = sl.shape()
 
   for (const s of slides) {
     const draw = s.words

@@ -151,51 +151,77 @@
           </div>
           <input id="song-file" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg" hidden />
         </div>
-        <div id="gift" class="song gift">
-          <button id="gift-add" class="song__add" type="button">
-            <span class="song__icon gift__icon" aria-hidden="true">✦</span>
-            <span class="song__label">Jadikan kado</span>
-            <span class="song__hint">premium · foto kalian dari ribuan pesan, bab momen, tanpa watermark</span>
-          </button>
-          <div id="gift-deck" class="song__deck gift__deck" hidden>
-            <p class="song__top">
-              <span class="song__icon gift__icon" aria-hidden="true">✦</span>
-              <b>Premium</b>
-              <span class="gift__badge">gratis selama uji coba</span>
-              <button id="gift-drop" class="song__x" type="button" aria-label="Matikan premium">×</button>
-            </p>
-            <div class="gift__row">
-              <button id="gift-photo" class="gift__photo" type="button" aria-label="Pilih foto kalian">
-                <canvas hidden></canvas>
-                <span class="gift__plus">+</span>
-                <span class="gift__photo-label">Foto kalian</span>
-              </button>
-              <textarea id="gift-message" class="gift__message" maxlength="160" rows="3" placeholder="Pesan penutup buat dia… (opsional)"></textarea>
-            </div>
-            <button id="custom-open" class="gift__custom" type="button"><span>Atur film</span><small>judul, nama panggilan, warna, scene</small><i aria-hidden="true">→</i></button>
-            <p class="gift__incl">Termasuk bab momen kalian, tanpa watermark, dan poster buat dicetak.</p>
-          </div>
-          <input id="gift-file" type="file" accept="image/*" hidden />
-        </div>
+        <button id="studio-open" class="studio-cta" type="button">
+          <span class="song__icon gift__icon" aria-hidden="true">✦</span>
+          <span class="studio-cta__text">
+            <b id="studio-cta-title">Custom film kalian</b>
+            <small id="studio-cta-sub">foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri</small>
+          </span>
+          <span class="gift__badge">Premium</span>
+          <i aria-hidden="true">→</i>
+        </button>
       </div>
-      <!-- premium: make the film yours (it all shows in the studio as you change it) -->
-      <aside id="custom" class="custom" hidden aria-label="Atur film">
-        <div class="custom__head">
-          <b>Atur film</b>
-          <button id="custom-done" class="custom__done" type="button">Selesai</button>
+    </section>
+
+    <!-- premium: the studio. The film itself, live, in the middle; the steps on one side, what you
+         change on the other -->
+    <section id="studio" class="studio" hidden aria-label="Studio">
+      <header class="studio__top">
+        <button id="studio-back" class="studio__back" type="button"><span aria-hidden="true">←</span> Kembali</button>
+        <p class="studio__brand"><span class="song__icon gift__icon" aria-hidden="true">✦</span> Studio <span class="gift__badge">gratis selama uji coba</span></p>
+        <button id="studio-reset" class="studio__reset" type="button">Hapus custom</button>
+      </header>
+      <nav id="studio-steps" class="studio__steps" aria-label="Langkah">
+        <button type="button" data-step="0"><span>01</span>Sampul</button>
+        <button type="button" data-step="1"><span>02</span>Kalian</button>
+        <button type="button" data-step="2"><span>03</span>Foto &amp; pesan</button>
+        <button type="button" data-step="3"><span>04</span>Scene kamu</button>
+        <button type="button" data-step="4"><span>05</span>Pilih scene</button>
+      </nav>
+      <div class="studio__stage">
+        <div class="studio__phone">
+          <canvas id="studio-canvas"></canvas>
+          <span id="studio-off" class="studio__off" hidden>Scene ini nggak dipakai</span>
         </div>
-        <label class="custom__field">
-          <span class="custom__label">Judul sampul</span>
-          <input id="custom-title" maxlength="40" autocomplete="off" />
-        </label>
-        <div class="custom__field">
-          <span class="custom__label">Nama panggilan &amp; warna <button id="custom-reset" class="custom__reset" type="button" hidden>warna tema</button></span>
-          <div id="custom-people" class="custom__people"></div>
-        </div>
-        <div class="custom__field">
-          <span class="custom__label">Scene kamu <small id="maker-left"></small></span>
+        <p id="studio-caption" class="studio__caption"></p>
+      </div>
+      <div id="studio-panel" class="studio__panel">
+        <section class="studio__pane" data-pane="0">
+          <h3>Judul film</h3>
+          <p>Muncul besar di sampul dan di poster.</p>
+          <input id="custom-title" class="studio__big" maxlength="40" autocomplete="off" />
+          <div id="title-ideas" class="studio__ideas"></div>
+        </section>
+        <section class="studio__pane" data-pane="1" hidden>
+          <h3>Kalian</h3>
+          <p>Nama panggilan dan warna gelembung masing-masing. Berlaku di seluruh film.</p>
+          <div id="custom-people" class="studio__people"></div>
+          <button id="custom-reset" class="studio__link" type="button" hidden>Balik ke warna tema</button>
+        </section>
+        <section class="studio__pane" data-pane="2" hidden>
+          <h3>Foto &amp; pesan penutup</h3>
+          <p>Ribuan gelembung chat kalian menyusun foto ini di akhir film, lalu pesanmu muncul huruf demi huruf.</p>
+          <div class="studio__photo-row">
+            <button id="gift-photo" class="gift__photo studio__photo" type="button" aria-label="Pilih foto kalian">
+              <canvas hidden></canvas>
+              <span class="gift__plus">+</span>
+              <span class="gift__photo-label">Pilih foto</span>
+            </button>
+            <div class="studio__photo-tips">
+              <b>Tips</b>
+              <span>Foto berdua, wajah kelihatan jelas, latar nggak terlalu ramai.</span>
+              <button id="gift-photo-drop" class="studio__link" type="button" hidden>Hapus foto</button>
+            </div>
+          </div>
+          <label class="studio__label" for="gift-message">Pesan penutup <small id="gift-count"></small></label>
+          <textarea id="gift-message" class="gift__message" maxlength="160" rows="3"></textarea>
+          <input id="gift-file" type="file" accept="image/*" hidden />
+        </section>
+        <section class="studio__pane" data-pane="3" hidden>
+          <h3>Scene kamu</h3>
+          <p>Bikin sampai 3 scene dari chat kalian sendiri: satu pesan, satu kata, atau satu hari.</p>
           <div id="maker-list" class="maker__list"></div>
-          <button id="maker-open" class="gift__custom maker__open" type="button"><span>+ Bikin scene</span><small>dari chat kalian sendiri</small><i aria-hidden="true">→</i></button>
+          <button id="maker-open" class="gift__custom maker__open" type="button"><span>+ Bikin scene</span><small id="maker-left"></small><i aria-hidden="true">→</i></button>
           <div id="maker" class="maker" hidden>
             <div id="maker-kind" class="maker__kinds" role="radiogroup" aria-label="Jenis scene"></div>
             <div class="maker__body">
@@ -219,12 +245,17 @@
               <button id="maker-add" type="button" class="custom__done" disabled>Tambah scene</button>
             </div>
           </div>
+        </section>
+        <section class="studio__pane" data-pane="4" hidden>
+          <h3>Pilih scene</h3>
+          <p>Ketuk buat lihat. Ketuk lagi buat matiin atau nyalain.</p>
+          <div id="custom-scenes" class="custom__scenes studio__scenes"></div>
+        </section>
+        <div class="studio__nav">
+          <button id="studio-prev" class="studio__link" type="button">← Sebelumnya</button>
+          <button id="studio-next" class="custom__done" type="button">Lanjut</button>
         </div>
-        <div class="custom__field">
-          <span class="custom__label">Scene <small>ketuk buat matiin</small></span>
-          <div id="custom-scenes" class="custom__scenes"></div>
-        </div>
-      </aside>
+      </div>
     </section>
 
     <section id="story" class="story" hidden>

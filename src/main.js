@@ -5,6 +5,7 @@ import { computeMoments } from './moments.js'
 import { rename, recolor, renameScenes } from './custom.js'
 import { MAX_SCENES, KINDS, OBJECTS, objectsFor, searchMessages, quoteScene, countScene, dayScene } from './story/scenes.js'
 import { makeStory, posterWords } from './story/slides.js'
+import { W, H } from './story/draw.js'
 import { Player } from './player.js'
 import { readSong, suggestStart, snap } from './music/beat.js'
 import { Track } from './music/track.js'
@@ -330,7 +331,7 @@ let lengthOf = null
 function filmLength() {
   const { stats, theme, premium } = film()
   const key = premium ? `${!!premium.photo}${!!premium.message.trim()}${[...premium.hidden].sort()}${premium.scenes.map((sc) => sc.id)}` : ''
-  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium).reduce((a, s) => a + s.duration, 0) }
+  if (lengthOf?.chat !== chat || lengthOf.key !== key) lengthOf = { chat, key, s: makeStory(stats, 300, theme, premium, { sculpt: false }).reduce((a, s) => a + s.duration, 0) }
   return lengthOf.s
 }
 
@@ -374,7 +375,7 @@ function songUI() {
 }
 
 // the preview: the film's part of the song, round and round
-function preview(on = true) {
+function listen(on = true) {
   if (!song) return
   song.paused = !on
   if (on) song.track.play(song.start, 0.15)
@@ -400,7 +401,7 @@ $('song-file').addEventListener('change', async () => {
     song = { name: file.name.replace(/\.[^.]+$/, ''), buffer, beat, track: new Track(audio, buffer), start: 0 }
     song.start = suggestStart(beat, filmLength())
     songUI()
-    preview()
+    listen()
   } catch (err) {
     console.error(err)
     songEl.classList.add('is-error')
@@ -415,10 +416,10 @@ $('song-drop').addEventListener('click', () => {
   $('song-hint').textContent = HINT
   songUI()
   gift = null
-  $('gift-message').value = ''
-  giftUI()
-  custom.hidden = true
-  picker.classList.remove('is-custom')
+  studioCTA()
+  studio.hidden = true
+  document.body.classList.remove('is-studio')
+  pv = null
   composerPlay()
 })
 // slide the lit part along (it snaps to a beat when you let go); a tap without sliding: play/pause
@@ -445,8 +446,8 @@ $('song-drop').addEventListener('click', () => {
     if (drag.moved) {
       song.start = snap(song.beat, song.start)
       drawWave()
-      preview()
-    } else preview(song.paused || !song.track.on)
+      listen()
+    } else listen(song.paused || !song.track.on)
     drag = null
   }
   songWave.addEventListener('pointerup', end)
@@ -458,7 +459,7 @@ $('song-drop').addEventListener('click', () => {
     const bar = 4 * song.beat.period
     song.start = snap(song.beat, Math.max(0, Math.min(song.beat.duration - 4, song.start + (e.key === 'ArrowRight' ? bar : -bar))))
     drawWave()
-    preview()
+    listen()
   })
 }
 addEventListener('resize', () => song && view === 'picker' && drawWave())
@@ -469,11 +470,14 @@ function songFrame() {
   if (T >= Math.min(filmLength(), song.beat.duration - song.start - 0.1)) song.track.play(song.start, 0.15)
 }
 
-// — premium ("make it a gift"): no payment yet, it simply turns on —
-// Your photo (the bubbles build it, right here in the picker, and at the end of the film), your
-// own words to end on, the chapters of your moments, no watermark, and a poster.
+// — premium: the studio —
+// No payment yet: it simply turns on. Out of the picker, into a page of its own: the film itself,
+// live, in a phone in the middle (each change shows at once: a new sculpture flies in, a new
+// colour runs through as a wave, new words appear in place), five steps beside it — the cover's
+// title, your names and colours, your photo and closing words, scenes of your own, which scenes
+// to keep — and the film plays from the last step.
 let gift = null // { photo: a 4:5 canvas or null, message, title, names: { chat name → nickname }, colors: [hex], hidden: Set of slide ids, scenes: your own (story/scenes.js) }
-const newGift = () => ({ photo: null, message: $('gift-message').value, title: '', names: {}, colors: [], hidden: new Set(), scenes: [] })
+const newGift = () => ({ photo: null, message: '', title: '', names: {}, colors: [], hidden: new Set(), scenes: [] })
 // what the film is made of, with the gift's changes: the stats (renamed), the theme (recoloured),
 // and the premium part for makeStory
 function film() {
@@ -482,12 +486,193 @@ function film() {
   const premium = gift && { moments: stats.moments, photo: gift.photo, message: gift.message, title: gift.title, hidden: gift.hidden, scenes: renameScenes(gift.scenes, gift.names) }
   return { stats, theme, premium }
 }
+// the picker's name line follows the title and the nicknames; its studio button, what you've done
+function showWho() {
+  if (!chat) return
+  $('picker-who').textContent = gift?.title.trim() || whoOf(gift ? rename(chat.stats, gift.names) : chat.stats)
+}
+function studioCTA() {
+  if (!gift) {
+    $('studio-cta-title').textContent = 'Custom film kalian'
+    $('studio-cta-sub').textContent = 'foto kalian dari ribuan pesan, judul, nama panggilan, scene sendiri'
+    return
+  }
+  const done = [
+    gift.title.trim() && 'judul',
+    Object.values(gift.names).some((v) => v.trim()) && 'nama panggilan',
+    gift.colors.some(Boolean) && 'warna',
+    gift.photo && 'foto',
+    gift.message.trim() && 'pesan',
+    gift.scenes.length && `${gift.scenes.length} scene kamu`,
+  ].filter(Boolean)
+  $('studio-cta-title').textContent = 'Film kalian udah di-custom ✓'
+  $('studio-cta-sub').textContent = done.length ? `${done.join(' · ')} · ubah lagi` : 'buka studio lagi'
+}
+
+const studio = $('studio')
+const studioCanvas = $('studio-canvas')
+const sctx = studioCanvas.getContext('2d')
+studioCanvas.width = W
+studioCanvas.height = H
+const STEPS = ['Sampul', 'Kalian', 'Foto & pesan', 'Scene kamu', 'Pilih scene']
+let step = 0
+let viewing = null // the slide you tapped on the last step
+let pv = null // the preview: { slides: [the one slide], t0, id }
+document.querySelectorAll('#studio-steps button').forEach((b, i) => b.style.setProperty('--k', i))
+
+function fitPreview() {
+  const r = studioCanvas.getBoundingClientRect()
+  const w = Math.min(1080, Math.round(r.width * Math.min(devicePixelRatio || 1, 2)))
+  if (w > 0) engine.resize(w, Math.round((w * 16) / 9), 1)
+}
+// which slide each step shows
+function viewOf(i) {
+  if (i === 0) return 'cover'
+  if (i === 1) return chat.stats.group ? 'awards' : 'share'
+  if (i === 2) return 'ending'
+  if (i === 3) return draft?.data ? 'draft' : gift.scenes.at(-1)?.id ?? 'summary'
+  return viewing ?? 'summary'
+}
+/**
+ * Show slide id in the phone. how: 'fly' (a new sculpture: the bubbles fly there), 'wave' (the same
+ * one in new colours), 'words' (only the words changed: they stay where they are)
+ */
+function preview(id, how = 'fly') {
+  engine ??= new Engine({ count: N, quality: mobile ? 0.5 : 1 })
+  const { stats, theme, premium } = film()
+  const scenes = draft?.data ? [...premium.scenes, { ...draft.data, object: draft.object, title: draft.title, id: 'draft' }] : premium.scenes
+  const make = (only) => makeStory(stats, N, theme, { ...premium, hidden: new Set(), scenes }, { only })
+  let slides = make(id)
+  if (!slides.length) slides = make((id = 'cover'))
+  const now = performance.now()
+  if (!pv) {
+    fitPreview()
+    engine.setStory(slides, nebula(N, authors({ sequence: new Uint16Array([0, 1]) }, N)))
+    pv = { slides, t0: now, id }
+  } else if (how === 'fly' || id !== pv.id || engine.lastClock == null) {
+    engine.setStory(slides, engine.snapshot())
+    pv = { slides, t0: now, id }
+  } else {
+    if (how === 'wave') engine.flipTo(slides[0])
+    else engine.slides[0] = slides[0]
+    pv.slides = slides
+  }
+  $('studio-off').hidden = !gift.hidden.has(id)
+  $('studio-caption').textContent = `Preview · ${slides[0].label}`
+}
+// the phone, every frame (only while the studio's open)
+function studioFrame(now) {
+  requestAnimationFrame(studioFrame)
+  studioDraw(now)
+}
+function studioDraw(now) {
+  if (view !== 'studio' || !pv) return
+  const t = (now - pv.t0) / 1000
+  engine.render(0, t)
+  sctx.drawImage(engine.canvas, 0, 0, W, H)
+  pv.slides[0].words(sctx, t)
+}
+requestAnimationFrame(studioFrame)
+// typing: the words follow a moment later (building the slide again on every key would stutter)
+let typed = null
+const soon = (fn) => {
+  clearTimeout(typed)
+  typed = setTimeout(fn, 140)
+}
+
+function showStep(i) {
+  step = i
+  document.querySelectorAll('#studio-steps button').forEach((b, k) => (k === i ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current')))
+  for (const pane of studio.querySelectorAll('.studio__pane')) {
+    const on = +pane.dataset.pane === i
+    pane.hidden = !on
+    if (on) restart(pane, 'is-in')
+  }
+  $('studio-prev').style.visibility = i ? 'visible' : 'hidden'
+  $('studio-next').textContent = i < STEPS.length - 1 ? `Lanjut: ${STEPS[i + 1]} →` : 'Putar film ✦'
+  if (draft && i !== 3) openMaker(false, { quiet: true })
+  ;[fillCover, fillPeople, fillPhoto, makerList, fillScenes][i]()
+  $('studio-panel').scrollTop = 0
+  preview(viewOf(i))
+}
+$('studio-steps').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-step]')
+  if (b && +b.dataset.step !== step) showStep(+b.dataset.step)
+})
+$('studio-prev').addEventListener('click', () => step > 0 && showStep(step - 1))
+$('studio-next').addEventListener('click', () => (step < STEPS.length - 1 ? showStep(step + 1) : playFromStudio()))
+
+// 1. the cover's title (with a few ideas from your chat)
+function fillCover() {
+  const S = rename(chat.stats, gift.names)
+  const P = S.people
+  // (almost a year counts as one)
+  const span = S.spanDays >= 340 ? `${Math.max(1, Math.round(S.spanDays / 365))} Tahun` : `${Math.max(1, Math.round(S.spanDays / 30))} Bulan`
+  const ideas = S.group
+    ? [`${span} Bareng`, S.title ?? 'Geng Kita', `${S.total.toLocaleString('id-ID')} Pesan Kita`]
+    : [`${span} Kita`, `Untuk ${P[1].name.split(/\s+/)[0]}`, 'Kita, Sejauh Ini', `${S.total.toLocaleString('id-ID')} Pesan Kita`]
+  $('custom-title').value = gift.title
+  $('custom-title').placeholder = whoOf(S)
+  $('title-ideas').innerHTML = ideas.map((t) => `<button type="button">${esc(t)}</button>`).join('')
+}
+$('custom-title').addEventListener('input', (e) => {
+  gift.title = e.target.value
+  showWho()
+  soon(() => preview('cover', 'words'))
+})
+$('title-ideas').addEventListener('click', (e) => {
+  const b = e.target.closest('button')
+  if (!b) return
+  gift.title = $('custom-title').value = b.textContent
+  showWho()
+  preview('cover', 'words')
+})
+
+// 2. names and colours (a palette of ours, or any colour you like)
+const PALETTE = ['#ff5d8f', '#ffb18a', '#ff4d4d', '#ffd23f', '#c8ff3d', '#5effb0', '#33d1ff', '#5b8cff', '#9a6bff', '#e7c4ff', '#f2f6ff']
+function fillPeople() {
+  const S = chat.stats
+  const theme = chat.theme
+  $('custom-people').innerHTML = S.people
+    .slice(0, S.group ? 6 : 2)
+    .map((p, i) => {
+      const c = gift.colors[i] || theme.people[i % theme.people.length]
+      const name = esc(p.name)
+      return `<div class="studio__person" style="--c:${c}">
+        <div class="studio__person-top"><span class="custom__swatch" style="--c:${c}"></span><input class="custom__name" data-name="${name}" value="${esc(gift.names[p.name] ?? '')}" placeholder="${name}" maxlength="24" autocomplete="off"></div>
+        <div class="studio__swatches">${PALETTE.map((h) => `<button type="button" data-i="${i}" data-c="${h}" style="--c:${h}" aria-pressed="${h === c}" aria-label="Warna ${h}"></button>`).join('')}<label style="--c:${c}" title="Warna lain"><input type="color" data-i="${i}" value="${c}"></label></div>
+      </div>`
+    })
+    .join('')
+  $('custom-reset').hidden = !gift.colors.some(Boolean)
+}
+function setColor(i, c) {
+  gift.colors[i] = c
+  fillPeople()
+  preview(viewOf(1), 'wave')
+  if (song) drawWave()
+}
+$('custom-people').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-c]')
+  if (b) setColor(+b.dataset.i, b.dataset.c)
+})
+$('custom-people').addEventListener('change', (e) => e.target.type === 'color' && setColor(+e.target.dataset.i, e.target.value))
+$('custom-people').addEventListener('input', (e) => {
+  const el = e.target
+  if (el.type === 'color') return
+  gift.names[el.dataset.name] = el.value
+  showWho()
+  soon(() => preview(viewOf(1), 'words'))
+})
+$('custom-reset').addEventListener('click', () => {
+  gift.colors = []
+  fillPeople()
+  preview(viewOf(1), 'wave')
+})
+
+// 3. your photo and closing words
 const giftPhoto = $('gift-photo')
-function giftUI() {
-  $('gift-add').hidden = !!gift
-  $('gift-deck').hidden = !gift
-  $('gift-message').placeholder = `Pesan penutup buat ${chat?.stats.group ? 'mereka' : 'dia'}… (opsional)`
-  if (!gift) return
+function fillPhoto() {
   const c = giftPhoto.querySelector('canvas')
   giftPhoto.classList.toggle('has-photo', !!gift.photo)
   c.hidden = !gift.photo
@@ -496,22 +681,22 @@ function giftUI() {
     c.height = gift.photo.height
     c.getContext('2d').drawImage(gift.photo, 0, 0)
   }
+  $('gift-photo-drop').hidden = !gift.photo
+  $('gift-message').value = gift.message
+  $('gift-message').placeholder = `Tulis sesuatu buat ${chat.stats.group ? 'mereka' : 'dia'}… (opsional)`
+  $('gift-count').textContent = `${gift.message.length}/160`
 }
-$('gift-add').addEventListener('click', () => {
-  gift = newGift()
-  giftUI()
-})
-$('gift-drop').addEventListener('click', () => {
-  const had = gift?.photo
-  const colored = gift?.colors.some(Boolean)
-  gift = null
-  giftUI()
-  showWho()
-  if (had && view === 'picker') stage.show('cover', { theme: chat.theme })
-  else if (colored) setTheme(chat.theme)
-})
 giftPhoto.addEventListener('click', () => $('gift-file').click())
-$('gift-message').addEventListener('input', (e) => gift && (gift.message = e.target.value))
+$('gift-photo-drop').addEventListener('click', () => {
+  gift.photo = null
+  fillPhoto()
+  preview('ending')
+})
+$('gift-message').addEventListener('input', (e) => {
+  gift.message = e.target.value
+  $('gift-count').textContent = `${gift.message.length}/160`
+  soon(() => preview('ending', 'words'))
+})
 // a photo: turned the right way up, cropped to 4:5 (a little above the middle, where faces are)
 async function cropPhoto(file) {
   const img = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(async () => {
@@ -536,79 +721,44 @@ $('gift-file').addEventListener('change', async () => {
   if (!file || !gift) return
   try {
     gift.photo = await cropPhoto(file)
-    giftUI()
+    fillPhoto()
     // the bubbles build it, now
-    stage.setPhoto(gift.photo)
-    stage.show('portrait', { force: true, style: 'fly' })
+    preview('ending')
   } catch (err) {
     console.error(err)
   }
 })
 
-// — premium: "Atur film": the cover's title, nicknames, colours, which scenes —
-const custom = $('custom')
-// the picker's name line follows the title and the nicknames
-function showWho() {
-  if (!chat) return
-  $('picker-who').textContent = gift?.title.trim() || whoOf(gift ? rename(chat.stats, gift.names) : chat.stats)
-}
-function openCustom(on) {
-  if (!gift) return
-  if (!on && draft) openMaker(false)
-  custom.hidden = !on
-  picker.classList.toggle('is-custom', on)
-  composer.classList.toggle('is-away', on)
-  if (!on) return view === 'picker' && composerPlay()
-  const S = chat.stats
-  const theme = chat.theme
-  $('custom-title').value = gift.title
-  $('custom-title').placeholder = whoOf(S)
-  // a row per person: their colour (tap to change) and what to call them
-  const people = S.people.slice(0, S.group ? 6 : 2)
-  $('custom-people').innerHTML = people
-    .map((p, i) => {
-      const c = gift.colors[i] || theme.people[i % theme.people.length]
-      return `<div class="custom__person"><label class="custom__swatch" style="--c:${c}" title="Ganti warna"><input type="color" data-i="${i}" value="${c}" aria-label="Warna ${p.name}"></label><input class="custom__name" data-name="${p.name.replace(/"/g, '&quot;')}" value="${(gift.names[p.name] ?? '').replace(/"/g, '&quot;')}" placeholder="${p.name.replace(/"/g, '&quot;')}" maxlength="24" autocomplete="off"></div>`
-    })
-    .join('')
-  $('custom-reset').hidden = !gift.colors.some(Boolean)
-  makerList()
-  // every scene the film would have (the cover always stays)
-  const { stats, theme: t, premium } = film()
-  const slides = makeStory(stats, 300, t, { ...premium, hidden: new Set() })
+// 5. which scenes: tap one to see it, tap it again to switch it off (or on)
+function fillScenes() {
+  const { stats, theme, premium } = film()
+  const slides = makeStory(stats, 300, theme, { ...premium, hidden: new Set() }, { sculpt: false })
   $('custom-scenes').innerHTML = slides
-    .map((sl) => `<button type="button" class="custom__scene" data-id="${sl.id}" aria-pressed="${!gift.hidden.has(sl.id)}" ${sl.id === 'cover' ? 'disabled' : ''}>${sl.label}</button>`)
+    .map((sl) => `<button type="button" class="custom__scene${sl.id === viewing ? ' is-viewing' : ''}" data-id="${sl.id}" aria-pressed="${!gift.hidden.has(sl.id)}">${esc(sl.label)}</button>`)
     .join('')
 }
-$('custom-open').addEventListener('click', () => openCustom(true))
-$('custom-done').addEventListener('click', () => openCustom(false))
-$('custom-title').addEventListener('input', (e) => {
-  gift.title = e.target.value
-  showWho()
-})
-$('custom-people').addEventListener('input', (e) => {
-  const el = e.target
-  if (el.type === 'color') {
-    gift.colors[+el.dataset.i] = el.value
-    el.parentElement.style.setProperty('--c', el.value)
-    $('custom-reset').hidden = false
-    // the studio recolours as you go
-    setTheme(film().theme)
-    if (song) drawWave()
-  } else {
-    gift.names[el.dataset.name] = el.value
-    showWho()
+$('custom-scenes').addEventListener('click', (e) => {
+  const b = e.target.closest('.custom__scene')
+  if (!b) return
+  const id = b.dataset.id
+  if (viewing !== id) {
+    viewing = id
+    for (const x of $('custom-scenes').children) x.classList.toggle('is-viewing', x === b)
+    return preview(id)
   }
+  if (id === 'cover') return // the cover always stays
+  const on = gift.hidden.has(id)
+  if (on) gift.hidden.delete(id)
+  else gift.hidden.add(id)
+  b.setAttribute('aria-pressed', on)
+  $('studio-off').hidden = on
+  if (song) drawWave()
 })
-$('custom-reset').addEventListener('click', () => {
-  gift.colors = []
-  setTheme(chat.theme)
-  openCustom(true)
-})
+
 // — making a scene of your own: what it's about (a message, a word, a day), which of our forms,
-// a title if you like; the studio shows it as you go —
+// a title if you like; the phone shows it as you go —
 let draft = null // { kind, data (the scene's numbers, or null while there's nothing yet), object, title }
-const esc = (str) => str.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const esc = (str) => String(str).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 const fmtDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 function sceneName(sc) {
   if (sc.title?.trim()) return sc.title.trim()
@@ -618,15 +768,12 @@ function sceneName(sc) {
 }
 function makerList() {
   $('maker-list').innerHTML = gift.scenes
-    .map((sc) => `<div class="maker__item"><small>${KINDS[sc.kind].label}</small><b>${esc(sceneName(sc))}</b><button class="song__x" type="button" data-id="${sc.id}" aria-label="Hapus scene">×</button></div>`)
+    .map((sc) => `<div class="maker__item" data-view="${sc.id}"><small>${KINDS[sc.kind].label}</small><b>${esc(sceneName(sc))}</b><button class="song__x" type="button" data-id="${sc.id}" aria-label="Hapus scene">×</button></div>`)
     .join('')
-  $('maker-left').textContent = gift.scenes.length ? `${gift.scenes.length} dari ${MAX_SCENES}` : `maks ${MAX_SCENES}, masuk sebelum penutup`
+  $('maker-left').textContent = gift.scenes.length ? `${gift.scenes.length} dari ${MAX_SCENES}` : 'dari chat kalian sendiri'
   $('maker-open').hidden = gift.scenes.length >= MAX_SCENES || !!draft
 }
-function back3D() {
-  if (view === 'picker') gift?.photo ? stage.show('portrait', { force: true }) : stage.show('cover', { force: true })
-}
-function openMaker(on) {
+function openMaker(on, { quiet = false } = {}) {
   draft = on ? { kind: 'quote', data: null, object: null, title: '' } : null
   $('maker').hidden = !on
   if (on) {
@@ -641,10 +788,10 @@ function openMaker(on) {
     $('maker-day').max = iso(S.end)
     makerDraw()
     $('maker-q').focus()
-  } else back3D()
+  } else if (!quiet) preview(viewOf(3))
   makerList()
 }
-// the kinds, the forms, what was found, and the 3D
+// the kinds, the forms, what was found, and the phone
 function makerDraw() {
   $('maker-kind').innerHTML = Object.entries(KINDS)
     .map(([k, v]) => `<button type="button" role="radio" data-kind="${k}" aria-checked="${draft.kind === k}">${v.label}</button>`)
@@ -664,8 +811,8 @@ function makerDraw() {
     found.innerHTML = d ? `<b>${d.total}×</b> · ${P.map((p) => `${esc(p.name)} ${d.by[p.name] ?? 0}`).join(' · ')}` : $('maker-word').value.trim().length > 1 ? 'Nggak ketemu di chat kalian.' : ''
   } else if (draft.kind === 'day') {
     found.innerHTML = d ? `<b>${d.n} pesan</b> hari itu` : $('maker-day').value ? 'Hari itu kalian nggak ngobrol.' : ''
-  } else found.innerHTML = d ? '' : ''
-  if (d) stage.preview({ ...d, object: draft.object })
+  } else found.innerHTML = ''
+  if (d) preview('draft')
 }
 function makerSet(data) {
   draft.data = data
@@ -678,7 +825,6 @@ $('maker-kind').addEventListener('click', (e) => {
   if (!b || b.dataset.kind === draft.kind) return
   draft = { ...draft, kind: b.dataset.kind, data: null, object: null }
   makerDraw()
-  back3D()
 })
 $('maker-q').addEventListener('input', (e) => {
   const q = e.target.value
@@ -708,32 +854,110 @@ $('maker-objects').addEventListener('click', (e) => {
   draft.object = b.dataset.object
   makerDraw()
 })
-$('maker-title').addEventListener('input', (e) => (draft.title = e.target.value))
+$('maker-title').addEventListener('input', (e) => {
+  draft.title = e.target.value
+  if (draft.data) soon(() => preview('draft', 'words'))
+})
 $('maker-add').addEventListener('click', () => {
   if (!draft?.data || gift.scenes.length >= MAX_SCENES) return
-  gift.scenes.push({ ...draft.data, object: draft.object, title: draft.title.trim(), id: `mine-${Date.now()}` })
-  openMaker(false)
-  openCustom(true)
+  const id = `mine-${Date.now()}`
+  gift.scenes.push({ ...draft.data, object: draft.object, title: draft.title.trim(), id })
+  draft = null
+  $('maker').hidden = true
+  makerList()
+  preview(id, 'words')
   if (song) drawWave()
 })
 $('maker-list').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-id]')
-  if (!b) return
-  gift.scenes = gift.scenes.filter((sc) => sc.id !== b.dataset.id)
-  gift.hidden.delete(b.dataset.id)
-  openCustom(true)
-  if (song) drawWave()
+  const x = e.target.closest('[data-id]')
+  if (x) {
+    gift.scenes = gift.scenes.filter((sc) => sc.id !== x.dataset.id)
+    gift.hidden.delete(x.dataset.id)
+    makerList()
+    if (!draft) preview(viewOf(3))
+    if (song) drawWave()
+    return
+  }
+  const item = e.target.closest('[data-view]')
+  if (item && !draft) preview(item.dataset.view)
 })
 
-$('custom-scenes').addEventListener('click', (e) => {
-  const b = e.target.closest('.custom__scene')
-  if (!b || b.disabled) return
-  const on = b.getAttribute('aria-pressed') !== 'true'
-  b.setAttribute('aria-pressed', on)
-  if (on) gift.hidden.delete(b.dataset.id)
-  else gift.hidden.add(b.dataset.id)
+// — into the studio and out —
+// in: the picker's words fly off, every bubble is drawn into one bright ball, a soft flash, and
+// the phone rises out of a blur with your film's cover raining into it; the steps and the panel
+// follow. Out: the phone sinks away and the picker builds itself back in.
+async function enterStudio() {
+  if (!chat?.messages) return
+  gift ??= newGift()
+  view = 'studio'
+  const move = ++moves
+  song?.track.stop(0.5)
+  picker.classList.add('is-leaving')
+  composer.classList.add('is-away')
+  stage.focus = 'centre'
+  stage.show('core', { force: true, style: 'gather' })
+  await wait(750)
+  if (move !== moves) return
+  picker.hidden = true
+  picker.classList.remove('is-leaving')
+  $('flash').classList.add('is-soft')
+  restart($('flash'), 'is-on')
+  document.body.classList.add('is-studio')
+  studio.hidden = false
+  restart(studio, 'is-entering')
+  pv = null
+  viewing = null
+  showStep(0)
+  setTimeout(() => move === moves && (stageOn = false), 600)
+  setTimeout(() => studio.classList.remove('is-entering'), 1800)
+}
+async function leaveStudio() {
+  const move = ++moves
+  if (draft) openMaker(false, { quiet: true })
+  studio.classList.add('is-leaving')
+  stageOn = true
+  document.body.classList.remove('is-studio')
+  const theme = gift ? film().theme : chat.theme
+  setTheme(theme)
+  await wait(520)
+  if (move !== moves) return
+  studio.hidden = true
+  studio.classList.remove('is-leaving')
+  pv = null
+  view = 'picker'
+  picker.hidden = false
+  restart(picker, 'is-entering')
+  stage.focus = 'side'
+  if (gift?.photo) {
+    stage.setPhoto(gift.photo)
+    stage.show('portrait', { force: true })
+  } else stage.show('cover', { force: true, theme })
+  showWho()
+  studioCTA()
+  composer.classList.remove('is-away')
+  composerPlay()
   if (song) drawWave()
+}
+async function playFromStudio() {
+  if (draft) openMaker(false, { quiet: true })
+  studio.classList.add('is-leaving')
+  stageOn = true
+  document.body.classList.remove('is-studio')
+  await wait(450)
+  studio.hidden = true
+  studio.classList.remove('is-leaving')
+  pv = null
+  composer.classList.remove('is-away')
+  play()
+}
+$('studio-open').addEventListener('click', enterStudio)
+$('studio-back').addEventListener('click', leaveStudio)
+$('studio-reset').addEventListener('click', () => {
+  gift = null
+  studioCTA()
+  leaveStudio()
 })
+addEventListener('resize', () => view === 'studio' && pv && fitPreview())
 
 // — reading a chat —
 
@@ -896,8 +1120,8 @@ async function showPicker({ stats, guess, messages }) {
   composer.classList.remove('is-away')
   composerPlay()
   if (song) songUI()
-  giftUI()
   showWho()
+  studioCTA()
   if (gift?.photo) {
     stage.setPhoto(gift.photo)
     stage.show('portrait', { force: true })
@@ -933,7 +1157,6 @@ async function play() {
   view = 'story'
   moves++
   await fontsReady
-  openCustom(false)
   const { stats, theme, premium } = film()
   // the preview fades; the film starts the song from the top of its part
   song?.track.stop(0.9)
@@ -977,10 +1200,10 @@ function back() {
   $('song-hint').textContent = HINT
   songUI()
   gift = null
-  $('gift-message').value = ''
-  giftUI()
-  custom.hidden = true
-  picker.classList.remove('is-custom')
+  studioCTA()
+  studio.hidden = true
+  document.body.classList.remove('is-studio')
+  pv = null
   storyView.hidden = true
   picker.hidden = true
   $('reading').hidden = true
@@ -1056,7 +1279,8 @@ frame.addEventListener('pointercancel', () => {
   if (player) player.held = false
 })
 addEventListener('keydown', (e) => {
-  if (view === 'picker' && e.key === 'Escape') return custom.hidden ? leavePicker() : openCustom(false)
+  if (view === 'picker' && e.key === 'Escape') return leavePicker()
+  if (view === 'studio' && e.key === 'Escape' && !e.target.closest('input, textarea')) return draft ? openMaker(false) : leaveStudio()
   if (!player) return
   if (e.key === 'ArrowRight') player.next()
   if (e.key === 'ArrowLeft') player.prev()
@@ -1170,4 +1394,4 @@ $('again').addEventListener('click', () => {
   back()
 })
 
-if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, posterImage, posterWords, THEMES, setChat: (c) => (chat = c), get song() { return song }, get gift() { return gift }, setGift: (g) => ((gift = g), giftUI()) }
+if (import.meta.env.DEV) window.__cw = { get player() { return player }, get story() { return story }, get engine() { return engine }, stage, analyse, showPicker, play, demoText, storyVideo, slideImage, posterImage, posterWords, THEMES, setChat: (c) => (chat = c), get song() { return song }, get gift() { return gift }, setGift: (g) => ((gift = g), studioCTA()), enterStudio, studioDraw: () => studioDraw(performance.now()) }

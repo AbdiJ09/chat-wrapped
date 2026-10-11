@@ -232,7 +232,7 @@ export class Engine {
    */
   flipTo(slide) {
     const u = this.bg.material.uniforms
-    this.flip = { col: this.cur.col.slice(), bg: u.uColor.value.clone(), glow: u.uGlow.value.clone(), rim: this.rim.color.clone(), at: this.lastClock }
+    this.flip = { col: this.cur.col.slice(), bg: u.uColor.value.clone(), glow: u.uGlow.value.clone(), rim: this.rim.color.clone(), at: this.lastClock ?? 0 }
     // one slide (the one showing), or the whole set of them
     if (Array.isArray(slide)) this.slides = slide
     else this.slides[this.lastI] = slide
