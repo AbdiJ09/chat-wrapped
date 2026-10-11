@@ -763,6 +763,7 @@ body.is-reading::before { opacity: 1; }
   background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%);
   transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s;
 }
+.studio-cta[hidden] { display: none; }
 .studio-cta::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.12) 50%, transparent 70%); transform: translateX(-100%); animation: cta-shine 4.5s ease-in-out 2s infinite; pointer-events: none; }
 @keyframes cta-shine { 0%, 70% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .studio-cta:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 14px 40px color-mix(in srgb, var(--accent) 22%, transparent); }

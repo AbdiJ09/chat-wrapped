@@ -975,6 +975,9 @@ async function playFromStudio() {
   composer.classList.remove('is-away')
   play()
 }
+// Custom (the studio, premium) is put away for now: the button is hidden, everything behind it stays
+const STUDIO = false
+$('studio-open').hidden = !STUDIO
 $('studio-open').addEventListener('click', enterStudio)
 $('studio-back').addEventListener('click', leaveStudio)
 $('studio-reset').addEventListener('click', () => {
