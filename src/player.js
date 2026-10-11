@@ -12,7 +12,7 @@ export const starts = (slides) => slides.reduce((a, s, i) => (a.push(i ? a[i - 1
 export function compose(ctx, story, i, t) {
   const { engine, slides } = story
   engine.render(i, t)
-  ctx.drawImage(engine.canvas, 0, 0, W, H)
+  if (engine.canvas.width) ctx.drawImage(engine.canvas, 0, 0, W, H)
   slides[i].words(ctx, t)
 }
 

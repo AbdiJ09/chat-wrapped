@@ -1171,7 +1171,8 @@ function fitEngine() {
   // the 3D renders at the frame's real pixel size (at most 1080 wide); words are always 1080
   const r = $('story-frame').getBoundingClientRect()
   const w = Math.min(1080, Math.round(r.width * Math.min(devicePixelRatio || 1, 2)))
-  engine.resize(w, Math.round((w * 16) / 9), 1)
+  // (not laid out yet, e.g. in a hidden tab: keep the last size; a resize will fit it)
+  if (w > 0) engine.resize(w, Math.round((w * 16) / 9), 1)
 }
 
 async function play() {
