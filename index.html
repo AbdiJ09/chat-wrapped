@@ -172,11 +172,31 @@
               </button>
               <textarea id="gift-message" class="gift__message" maxlength="160" rows="3" placeholder="Pesan penutup buat dia… (opsional)"></textarea>
             </div>
+            <button id="custom-open" class="gift__custom" type="button"><span>Atur film</span><small>judul, nama panggilan, warna, scene</small><i aria-hidden="true">→</i></button>
             <p class="gift__incl">Termasuk bab momen kalian, tanpa watermark, dan poster buat dicetak.</p>
           </div>
           <input id="gift-file" type="file" accept="image/*" hidden />
         </div>
       </div>
+      <!-- premium: make the film yours (it all shows in the studio as you change it) -->
+      <aside id="custom" class="custom" hidden aria-label="Atur film">
+        <div class="custom__head">
+          <b>Atur film</b>
+          <button id="custom-done" class="custom__done" type="button">Selesai</button>
+        </div>
+        <label class="custom__field">
+          <span class="custom__label">Judul sampul</span>
+          <input id="custom-title" maxlength="40" autocomplete="off" />
+        </label>
+        <div class="custom__field">
+          <span class="custom__label">Nama panggilan &amp; warna <button id="custom-reset" class="custom__reset" type="button" hidden>warna tema</button></span>
+          <div id="custom-people" class="custom__people"></div>
+        </div>
+        <div class="custom__field">
+          <span class="custom__label">Scene <small>ketuk buat matiin</small></span>
+          <div id="custom-scenes" class="custom__scenes"></div>
+        </div>
+      </aside>
     </section>
 
     <section id="story" class="story" hidden>

@@ -92,7 +92,8 @@ export class Stage {
   }
 
   #slide(name) {
-    const key = `${name}:${this.theme.id}`
+    // (a theme with your own colours is the same theme, but not the same look)
+    const key = `${name}:${this.theme.id}:${this.theme.people.join()}`
     if (!this.cache.has(key)) {
       const { theme } = this
       this.cache.set(key, { shape: build(name, this.stats, this.N, theme), cam: { dolly: 0, ...SCENES[name].cam }, bg: theme.bg, glow: theme.glow, rim: theme.people[1], duration: 0 })

@@ -113,3 +113,21 @@ test('premium moments: the first "sayang", who says it more, the longest silence
   assert.equal(m.silence.text, 'pagi')
   assert.equal(Math.round(m.silence.ms / 3600000), 6 * 24 + 11)
 })
+
+test('premium names: nicknames reach every name in the story', async () => {
+  const { computeStats } = await import('../src/stats.js')
+  const { computeMoments } = await import('../src/moments.js')
+  const { rename, recolor } = await import('../src/custom.js')
+  const parsed = parseWhatsApp(['01/03/24 20.00 - Hari: sayang', '01/03/24 20.01 - Uraaatu 👸: iya', '05/03/24 20.01 - Uraaatu 👸: halo'].join('\n'))
+  const S = computeStats(parsed)
+  S.moments = computeMoments(parsed.messages, parsed.people)
+  const R = rename(S, { 'Uraaatu 👸': 'Bubu', Hari: '  ' })
+  assert.deepEqual(new Set(R.people.map((p) => p.name)), new Set(['Bubu', 'Hari']))
+  assert.equal(R.first.author, 'Hari')
+  assert.equal(R.moments.silence.breaker, 'Bubu')
+  assert.deepEqual(R.moments.counts.couple, { Hari: 1, Bubu: 0 })
+  assert.equal(S.people.find((p) => p.name === 'Uraaatu 👸').name, 'Uraaatu 👸', 'the original stays as it was')
+  const t = { id: 'couple', people: ['#111111', '#222222'] }
+  assert.equal(recolor(t, []), t)
+  assert.deepEqual(recolor(t, [undefined, '#abcdef']).people, ['#111111', '#abcdef'])
+})
